@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Titleeeee</title>
+</head>
+<body onload="initTable()">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dygraph/1.2/dygraph-combined.js"></script>
+
+<h1>Cabin control 1</h1>
+<h2>Measurements</h2>
+<div id="graph1" style="width:80%;"></div>
+<div id="graph2" style="width:80%;"></div>
+<form action="" method="POST" style="background-color:lightgray;">
+Heating
+<input type="radio" name="input1" value="0" checked>On
+<input type="radio" name="input1" value="1">Off<br>
+Alarm system
+<input type="radio" name="input2" value="0">On
+<input type="radio" name="input2" value="1">Off<br>
+Sauna
+<input type="radio" name="input3" value="0">On
+<input type="radio" name="input3" value="1" checked>Off<br>
+Unused
+<input type="radio" name="input4" value="0">On
+<input type="radio" name="input4" value="1" checked>Off<br>
+<button>Save</button>
+</form>
+<h2>Events</h2>
+<div style="background-color:lightgray;">
+2012.03.11 12:00:23 Device bootup</br>
+2012.03.11 13:00:30 Input 1 (Door bell) activated</br>
+2012.03.11 13:00:31 Input 1 (Door bell) deactivated</br>
+2012.03.11 13:00:41 Input 2 (Front door) activated</br>
+2012.03.11 13:00:46 Input 2 (Front door) deactivated</br>
+</div>
+
+<script>
+function initTable(){
+    g = new Dygraph(document.getElementById("graph1"),
+    // For possible data formats, see http://dygraphs.com/data.html
+    // The x-values could also be dates, e.g. "2012/03/15"
+    "Date,Cabin1,Cabin2\n" +
+    "2012/02/11,0,10\n" +
+    "2012/02/12,6,16\n" +
+    "2012/02/13,4,14\n" +
+    "2012/02/14,2,12\n" +
+    "2012/02/16,8,18\n" +
+    "2012/02/17,10,20\n" +
+    "2012/02/18,12,22\n" +
+    "2012/02/19,14,24\n" +
+    "2012/02/20,14,24\n" +
+    "2012/02/21,0,10\n" +
+    "2012/02/22,6,16\n" +
+    "2012/02/23,4,14\n" +
+    "2012/02/24,7,17\n" +
+    "2012/02/26,8,18\n" +
+    "2012/02/27,10,10\n" +
+    "2012/02/28,12,12\n" +
+    "2012/03/01,0,10\n" +
+    "2012/03/02,6,16\n" +
+    "2012/03/03,4,14\n" +
+    "2012/03/04,10,10\n" +
+    "2012/03/06,8,18\n" +
+    "2012/03/07,10,10\n" +
+    "2012/03/08,12,12\n" +
+    "2012/03/09,14,14\n" +
+    "2012/03/11,0,10\n" +
+    "2012/03/12,6,16\n" +
+    "2012/03/13,4,14\n" +
+    "2012/03/14,1, \n" +
+    "2012/03/16,8,18\n" +
+    "2012/03/17,10,10\n" +
+    "2012/03/18,12,12\n" +
+    "2012/03/19,14,14\n" +
+    "2012/03/20,14,14\n" +
+    "2012/03/21,0,10\n" +
+    "2012/03/22,6,16\n" +
+    "2012/03/23,4,14\n" +
+    "2012/03/24,5,15\n" +
+    "2012/03/26,8,18\n" +
+    "2012/03/27,10,10\n" +
+    "2012/03/28,12,12\n" +
+    "2012/03/29,14,14\n",
+    {
+        // options go here. See http://dygraphs.com/options.html
+        legend: 'always',
+        animatedZooms: true,
+        title: 'Inside temperature measurements',
+        valueRange: [-20, 30]
+        // drawCallback: function(g, is_initial) {
+        //     if (!is_initial) return;
+        //     g.setAnnotations([
+        //     {
+        //     series: "Cabin1",
+        //     x:  "2012/03/22",
+        //     shortText: "AAAAAAA aaaaa",
+        //     text: "BBBB bbbbb"
+        //     }]
+        //  );
+        // }
+        // ylabel: 'Temperature (C)',
+    });
+    g.setAnnotations([
+        {
+            series: "Cabin2",
+            x:  "2012/03/02",
+            shortText: "Event",
+            text: "Event Description"
+        },
+        {
+            series: "Cabin1",
+            x:  "2012/03/02",
+            shortText: "Event",
+            text: "Event Description"
+        }
+    ]);
+    g2 = new Dygraph(document.getElementById("graph2"),
+    // For possible data formats, see http://dygraphs.com/data.html
+    // The x-values could also be dates, e.g. "2012/03/15"
+    "Date,Outside temperature\n" +
+    "2012/02/11,3\n" +
+    "2012/02/12,6\n" +
+    "2012/02/13,8\n" +
+    "2012/02/14,12\n" +
+    "2012/02/16,9\n" +
+    "2012/02/17,8\n" +
+    "2012/02/18,6\n" +
+    "2012/02/19,3\n" +
+    "2012/02/20,3\n" +
+    "2012/02/21,3\n" +
+    "2012/02/22,6\n" +
+    "2012/02/23,8\n" +
+    "2012/02/24,23\n" +
+    "2012/02/26,9\n" +
+    "2012/02/27,8\n" +
+    "2012/02/28,6\n" +
+    "2012/03/01,3\n" +
+    "2012/03/02,6\n" +
+    "2012/03/03,8\n" +
+    "2012/03/04,13\n" +
+    "2012/03/06,9\n" +
+    "2012/03/07,8\n" +
+    "2012/03/08,6\n" +
+    "2012/03/09,3\n" +
+    "2012/03/11,3\n" +
+    "2012/03/12,6\n" +
+    "2012/03/13,8\n" +
+    "2012/03/14,\n" +
+    "2012/03/16,9\n" +
+    "2012/03/17,8\n" +
+    "2012/03/18,6\n" +
+    "2012/03/19,3\n" +
+    "2012/03/20,3\n" +
+    "2012/03/21,3\n" +
+    "2012/03/22,6\n" +
+    "2012/03/23,8\n" +
+    "2012/03/24,10\n" +
+    "2012/03/26,9\n" +
+    "2012/03/27,8\n" +
+    "2012/03/28,6\n" +
+    "2012/03/29,3\n",
+    {
+        // options go here. See http://dygraphs.com/options.html
+        legend: 'always',
+        animatedZooms: true,
+        title: 'Outside temperature measurements',
+        valueRange: [-20, 30]
+        // ylabel: 'Temperature (C)',
+    });
+}
+</script>
+</body>
