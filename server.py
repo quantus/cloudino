@@ -7,10 +7,15 @@ from sqlalchemy import (
     Column,
     Integer,
     String,
-    DateTime
+    DateTime,
+    ForeignKey
 )
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import scoped_session, sessionmaker
+from sqlalchemy.orm import (
+    scoped_session,
+    sessionmaker,
+    relationship
+)
 Base = declarative_base()
 
 engine = create_engine('postgres://localhost/cloudino')
@@ -26,11 +31,13 @@ class Device(Base):
     last_seen = Column(DateTime, nullable=False)
     device_secret = Column(String, nullable=False)
 
+    measurements = relationship('Measurement', backref='device')
+
 
 class Measurement(Base):
     __tablename__ = 'measurement'
     id = Column(Integer, primary_key=True)
-    device_id = Column(Integer, nullable=False)
+    device_id = Column(Integer, ForeignKey('device.id'))
     ip_address = Column(String, nullable=False)
     measurement_name = Column(String, nullable=False)
     measurement_value = Column(Integer, nullable=False)
@@ -45,6 +52,8 @@ class MainHandler(tornado.web.RequestHandler):
 
 class ViewHandler(tornado.web.RequestHandler):
     def get(self):
+        device_ids = self.request.arguments.get('id', [])
+        devices = session.query(Device).filter(Device.id.in_(device_ids)).all()
         self.render("view_devices.html")
 
 
@@ -61,16 +70,17 @@ if __name__ == "__main__":
         print "Creating dummy data"
         from datetime import datetime, timedelta
         for i in range(3):
-            session.add(Device(
+            device = Device(
                 device_name='device %d' % i,
                 ip_address='127.0.0.1',
                 last_seen=datetime.now(),
                 device_secret='secret %d' % i
-            ))
+            )
+            session.add(device)
             for name in ['temperature_in', 'temperature_out']:
                 for m in range(100):
                     session.add(Measurement(
-                        device_id=i,
+                        device=device,
                         ip_address='127.0.0.1',
                         measurement_name=name,
                         measurement_type='measurement',
