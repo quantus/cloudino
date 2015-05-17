@@ -5,11 +5,10 @@
 </head>
 <h1>Welcome</h1>
 <h2>Select devices:</h2>
-<form action="view_devices.html" method="GET" style="background-color:lightgray;">
-<input type="checkbox" name="id" value="123">Cabin 1<br>
-<input type="checkbox" name="id" value="2432">Cabin 2<br>
-<input type="checkbox" name="id" value="2432">Coffee maker<br>
-<input type="checkbox" name="id" value="89">Outside lights<br>
+<form action="view_devices" method="GET" style="background-color:lightgray;">
+{% for device in devices %}
+<input type="checkbox" name="id" value="{{ device.id }}">{{device.device_name}}<br>
+{% end %}
 <button>GO!</button>
 </form>
 </body>
