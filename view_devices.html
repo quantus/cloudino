@@ -6,10 +6,14 @@
 <body onload="initTable()">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dygraph/1.2/dygraph-combined.js"></script>
 
-<h1>Cabin control 1</h1>
+<!-- <h1>Cabin control 1</h1> -->
 <h2>Measurements</h2>
-<div id="graph1" style="width:80%;"></div>
+{% for key in measurements %}
+<div id="graph_{{key.replace(' ', '_')}}" style="width:80%;"></div>
+{% end %}
+<!-- <div id="graph1" style="width:80%;"></div>
 <div id="graph2" style="width:80%;"></div>
+ -->
 <form action="" method="POST" style="background-color:lightgray;">
 
 {% for input in inputs %}
@@ -22,12 +26,24 @@
 <h2>Events</h2>
 <div style="background-color:lightgray;">
 {% for event in events %}
-{{ event.timestamp }} device={{ event.device.device_name }} name={{ event.measurement_name }} value= {{ event.measurement_value }}</br>
+{{ event.timestamp }} device={{ event.device.device_name }} name={{ event.measurement_name }} value={{ event.measurement_value }}</br>
 {% end %}
 </div>
-
+{% autoescape None %}
 <script>
 function initTable(){
+
+{% for key in csvs %}
+    g_{{key}} = new Dygraph(document.getElementById("graph_{{ key.replace(' ', '_') }}"),
+    {{ csvs[key] }},
+    {
+        legend: 'always',
+        animatedZooms: true,
+        title: '{{ key }}',
+        valueRange: [-20, 30]
+    });
+{% end %}
+
     g = new Dygraph(document.getElementById("graph1"),
     // For possible data formats, see http://dygraphs.com/data.html
     // The x-values could also be dates, e.g. "2012/03/15"
@@ -36,9 +52,9 @@ function initTable(){
     "2012/02/12,6,16\n" +
     "2012/02/13,4,14\n" +
     "2012/02/14,2,12\n" +
-    "2012/02/16,8,18\n" +
-    "2012/02/17,10,20\n" +
-    "2012/02/18,12,22\n" +
+    "2012/02/16,13,18\n" +
+    "2012/02/17,,20\n" +
+    "2012/02/18,,22\n" +
     "2012/02/19,14,24\n" +
     "2012/02/20,14,24\n" +
     "2012/02/21,0,10\n" +
@@ -95,21 +111,21 @@ function initTable(){
     g.setAnnotations([
         {
             series: "Cabin2",
-            x:  "2012/03/02",
-            shortText: "Event",
-            text: "Event Description"
+            x:  "2012/03/16",
+            shortText: "Boot",
+            text: "Boot Up"
         },
         {
             series: "Cabin1",
-            x:  "2012/03/02",
-            shortText: "Event",
-            text: "Event Description"
+            x:  "2012/02/19",
+            shortText: "Boot",
+            text: "Boot Up"
         }
     ]);
     g2 = new Dygraph(document.getElementById("graph2"),
     // For possible data formats, see http://dygraphs.com/data.html
     // The x-values could also be dates, e.g. "2012/03/15"
-    "Date,Outside temperature\n" +
+    "Date,Cabin2\n" +
     "2012/02/11,3\n" +
     "2012/02/12,6\n" +
     "2012/02/13,8\n" +
@@ -159,6 +175,15 @@ function initTable(){
         valueRange: [-20, 30]
         // ylabel: 'Temperature (C)',
     });
+    g2.setAnnotations([
+        {
+            series: "Cabin2",
+            x:  "2012/03/16",
+            shortText: "Boot",
+            text: "Boot Up"
+        }
+    ])
+
 }
 </script>
 </body>

@@ -1,5 +1,6 @@
 import sys
-
+from datetime import datetime, timedelta
+from collections import OrderedDict
 import tornado.ioloop
 import tornado.web
 from sqlalchemy import (
@@ -61,7 +62,6 @@ class MainHandler(tornado.web.RequestHandler):
 class ViewHandler(tornado.web.RequestHandler):
     def get(self):
         device_ids = self.request.arguments.get('id', [])
-        devices = session.query(Device).filter(Device.id.in_(device_ids)).all()
         inputs = {
             i[0] for i in
             (
@@ -76,12 +76,81 @@ class ViewHandler(tornado.web.RequestHandler):
         events = (
             session.query(Measurement)
             .filter(
-                Measurement.measurement_type=='event',
+                Measurement.measurement_type == 'event',
                 Measurement.device_id.in_(device_ids)
             )
             .order_by(Measurement.timestamp)
         ).all()
-        self.render("view_devices.html", inputs=inputs, events=events)
+        measurement_names = {i[0] for i in (
+            session.query(Measurement.measurement_name)
+            .filter(
+                Measurement.measurement_type == 'measurement',
+                Measurement.device_id.in_(device_ids)
+            )
+            .order_by(Measurement.timestamp)
+        ).all()
+        }
+
+        start_date = (datetime.now() - timedelta(days=14)).date()
+        end_date = datetime.now()  # .date()
+
+        device_ids = map(int, device_ids)
+        # import pudb;pu.db
+        measurements = OrderedDict()
+        for m in measurement_names:
+            measurements[m] = (
+                [(i[0], i[1], i[2]) for i in session.execute(
+                    '''
+WITH t AS (
+   SELECT ts
+   FROM   generate_series('%s', '%s', '15 minute'::interval) ts
+   )
+SELECT
+    ts,
+    device_id,
+    AVG(measurement_value)
+FROM t
+LEFT JOIN measurement ON
+    date_trunc('hour', timestamp) = date_trunc('hour', ts) AND
+    (extract(minute from timestamp)::int/15) = (extract(minute from ts)::int/15) AND
+    measurement_name = '%s'
+GROUP BY 1, 2
+ORDER BY 1, 2
+                    ''' % (start_date, end_date, m)
+                ).fetchall()]
+            )
+
+        measurements2 = OrderedDict()
+        for k in measurements:
+            handled_device_ids = set()
+            devices = []
+            data = measurements[k]
+            data2 = OrderedDict()
+            for time, device, value in data:
+                if not time in data2:
+                    data2[time] = OrderedDict()
+                data2[time][device] = value
+                if device and device not in handled_device_ids:
+                    handled_device_ids.update([device])
+                    devices.append(session.query(Device).get(device))
+            measurements2[k] = (devices, data2)
+
+        csvs = OrderedDict()
+        for graph_name in measurements2:
+            devices, m_data = measurements2[graph_name]
+            # import pudb;pu.db
+            msg = "'Date,{}\\n'".format(','.join(d.device_name for d in devices))
+            for t, data in m_data.items():
+                msg += "\n + '{},{}\\n'".format(t, ','.join(str(data.get(d.id,'')) for d in devices))
+            csvs[graph_name] = msg
+
+        self.render(
+            "view_devices.html",
+            inputs=inputs,
+            events=events,
+            measurements=measurements2,
+            csvs=csvs
+        )
 
 
 application = tornado.web.Application([
@@ -95,7 +164,6 @@ if __name__ == "__main__":
         Base.metadata.create_all(engine)
     elif '-dummy' in sys.argv:
         print "Creating dummy data"
-        from datetime import datetime, timedelta
         for i in range(3):
             device = Device(
                 device_name='device %d' % i,
@@ -113,13 +181,16 @@ if __name__ == "__main__":
                 timestamp=datetime.now() - timedelta(minutes=15*101)
             ))
             for name in ['temperature_in', 'temperature_out']:
-                for m in range(100):
+                for m in range(1000):
+                    from random import randint
+                    if m%100 in range(2*i*10, (2*i+1)*10):
+                        continue
                     session.add(Measurement(
                         device=device,
                         ip_address='127.0.0.1',
                         measurement_name=name,
                         measurement_type='measurement',
-                        measurement_value=m,
+                        measurement_value=(m+i) % 20 + randint(-10, 10),
                         timestamp=datetime.now() - timedelta(minutes=15*m)
                     ))
             for m in range(10):
