@@ -11,27 +11,19 @@
 <div id="graph1" style="width:80%;"></div>
 <div id="graph2" style="width:80%;"></div>
 <form action="" method="POST" style="background-color:lightgray;">
-Heating
+
+{% for input in inputs %}
+{{ input }}
 <input type="radio" name="input1" value="0" checked>On
 <input type="radio" name="input1" value="1">Off<br>
-Alarm system
-<input type="radio" name="input2" value="0">On
-<input type="radio" name="input2" value="1">Off<br>
-Sauna
-<input type="radio" name="input3" value="0">On
-<input type="radio" name="input3" value="1" checked>Off<br>
-Unused
-<input type="radio" name="input4" value="0">On
-<input type="radio" name="input4" value="1" checked>Off<br>
+{% end %}
 <button>Save</button>
 </form>
 <h2>Events</h2>
 <div style="background-color:lightgray;">
-2012.03.11 12:00:23 Device bootup</br>
-2012.03.11 13:00:30 Input 1 (Door bell) activated</br>
-2012.03.11 13:00:31 Input 1 (Door bell) deactivated</br>
-2012.03.11 13:00:41 Input 2 (Front door) activated</br>
-2012.03.11 13:00:46 Input 2 (Front door) deactivated</br>
+{% for event in events %}
+{{ event.timestamp }} device={{ event.device.device_name }} name={{ event.measurement_name }} value= {{ event.measurement_value }}</br>
+{% end %}
 </div>
 
 <script>
