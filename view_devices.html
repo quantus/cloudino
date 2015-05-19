@@ -18,8 +18,8 @@
 
 {% for input in inputs %}
 {{ input }}
-<input type="radio" name="input1" value="0" checked>On
-<input type="radio" name="input1" value="1">Off<br>
+<input type="radio" name="input_{{ input.replace(' ', '_') }}" value="0">On
+<input type="radio" name="input_{{ input.replace(' ', '_') }}" value="1">Off<br>
 {% end %}
 <button>Save</button>
 </form>

@@ -62,6 +62,7 @@ class MainHandler(tornado.web.RequestHandler):
 class ViewHandler(tornado.web.RequestHandler):
     def get(self):
         device_ids = self.request.arguments.get('id', [])
+        device_ids = map(int, device_ids)
         inputs = {
             i[0] for i in
             (
@@ -94,7 +95,6 @@ class ViewHandler(tornado.web.RequestHandler):
         start_date = (datetime.now() - timedelta(days=14)).date()
         end_date = datetime.now()  # .date()
 
-        device_ids = map(int, device_ids)
         # import pudb;pu.db
         measurements = OrderedDict()
         for m in measurement_names:
@@ -114,9 +114,10 @@ LEFT JOIN measurement ON
     date_trunc('hour', timestamp) = date_trunc('hour', ts) AND
     (extract(minute from timestamp)::int/15) = (extract(minute from ts)::int/15) AND
     measurement_name = '%s'
+WHERE device_id IN (%s)
 GROUP BY 1, 2
 ORDER BY 1, 2
-                    ''' % (start_date, end_date, m)
+                    ''' % (start_date, end_date, m, ','.join(map(str,device_ids)))
                 ).fetchall()]
             )
 
@@ -181,6 +182,8 @@ if __name__ == "__main__":
                 timestamp=datetime.now() - timedelta(minutes=15*101)
             ))
             for name in ['temperature_in', 'temperature_out']:
+                if i == 2 and name == 'temperature_out':
+                    continue
                 for m in range(1000):
                     from random import randint
                     if m%100 in range(2*i*10, (2*i+1)*10):
