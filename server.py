@@ -116,7 +116,7 @@ LEFT JOIN measurement ON
     date_trunc('hour', timestamp) = date_trunc('hour', ts) AND
     (extract(minute from timestamp)::int/15) = (extract(minute from ts)::int/15) AND
     measurement_name = '%s'
-WHERE device_id IN (%s)
+WHERE device_id IN (%s) OR device_id IS NULL
 GROUP BY 1, 2
 ORDER BY 1, 2
                     ''' % (start_date, end_date, m, ','.join(map(str,device_ids)))
@@ -141,7 +141,6 @@ ORDER BY 1, 2
         csvs = OrderedDict()
         for graph_name in measurements2:
             devices, m_data = measurements2[graph_name]
-            # import pudb;pu.db
             msg = "'Date,{}\\n'".format(','.join(d.device_name for d in devices))
             for t, data in m_data.items():
                 msg += "\n + '{},{}\\n'".format(t, ','.join(str(data.get(d.id,'')) for d in devices))
