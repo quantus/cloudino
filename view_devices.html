@@ -34,7 +34,7 @@
 function initTable(){
 
 {% for key in csvs %}
-    g_{{key}} = new Dygraph(document.getElementById("graph_{{ key.replace(' ', '_') }}"),
+    g_{{ key.replace(' ', '_') }} = new Dygraph(document.getElementById("graph_{{ key.replace(' ', '_') }}"),
     {{ csvs[key] }},
     {
         legend: 'always',

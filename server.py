@@ -97,7 +97,6 @@ class ViewHandler(tornado.web.RequestHandler):
         start_date = (datetime.now() - timedelta(days=14)).date()
         end_date = datetime.now()  # .date()
 
-        # import pudb;pu.db
         measurements = OrderedDict()
         for m in measurement_names:
             measurements[m] = (
@@ -146,6 +145,7 @@ ORDER BY 1, 2
                 msg += "\n + '{},{}\\n'".format(t, ','.join(str(data.get(d.id,'')) for d in devices))
             csvs[graph_name] = msg
 
+        # import pudb;pu.db
         self.render(
             "view_devices.html",
             inputs=inputs,
@@ -154,26 +154,81 @@ ORDER BY 1, 2
             csvs=csvs
         )
 
-connections = []
+unknown_connections = []
+connections = {}
 
 
 class DeviceHandler(websocket.WebSocketHandler):
+    device_id = None
+
     def open(self):
         print "Open conn: {}".format(self)
-        connections.append(self)
+        unknown_connections.append(self)
 
     def on_close(self):
-        print "Close conn: {}".format(self)
-        connections.remove(self)
+        if not self.device_id:
+            print "Close unknown conn: {}".format(self)
+            unknown_connections.remove(self)
+        else:
+            print "Close conn: {}, {}".format(self.device_id, self)
+            del connections[self.device_id]
 
     def on_message(self, message):
-        print "Conn: {} msg: {}".format(self, message)
         msg = json.loads(message)
-        print msg
+        if not self.device_id:
+            device = session.query(Device).filter(
+                Device.device_secret == msg['AUTH']
+            ).first()
+            if not device:
+                device = Device(
+                    device_secret=msg['AUTH'],
+                    device_name=msg['name'],
+                    ip_address='TODO',
+                    last_seen=datetime.now()
+                )
+                session.add(device)
+                session.flush()
+            self.device_id = device.id
+            if self.device_id in connections:
+                ex_connection = connections[self.device_id]
+                ex_connection.close()
+                assert self.device_id not in connections
+            connections[self.device_id] = self
+            unknown_connections.remove(self)
+
+        device = session.query(Device).get(self.device_id)
+        device.last_seen = datetime.now()
+        assert device
+        print "Message: {} msg: {}".format(self.device_id, msg)
         max_id = 0
         for measurement in msg['measurements']:
             max_id = max(max_id, measurement['packet_id'])
+            device = device
+            ip_address = 'TODO'
+            measurement_name = measurement['name']
+            measurement_value = measurement['value']
+            measurement_type = measurement['type']
+            timestamp = datetime.strptime(
+                measurement['time'],
+                '%Y-%m-%d %H:%M:%S'
+            )
+            if session.query(Measurement).filter(
+                Measurement.device == device,
+                Measurement.measurement_name == measurement_name,
+                Measurement.timestamp == timestamp
+            ).count() == 0:
+                session.add(Measurement(
+                    device=device,
+                    ip_address=ip_address,
+                    measurement_name=measurement_name,
+                    measurement_value=measurement_value,
+                    measurement_type=measurement_type,
+                    timestamp=timestamp
+                ))
+
+
         self.write_message(json.dumps({'packet_id': max_id, 'status': 'ok'}))
+        session.commit()
 
 
 application = tornado.web.Application([
