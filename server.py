@@ -21,7 +21,7 @@ from sqlalchemy.orm import (
 )
 Base = declarative_base()
 
-engine = create_engine('postgres://localhost/cloudino')
+engine = create_engine('postgresql+pg8000://localhost/cloudino')
 
 session = scoped_session(sessionmaker(bind=engine))()
 
