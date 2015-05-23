@@ -1,8 +1,10 @@
+import json
 import sys
 from datetime import datetime, timedelta
 from collections import OrderedDict
 import tornado.ioloop
 import tornado.web
+from tornado import websocket
 from sqlalchemy import (
     create_engine,
     Column,
@@ -62,7 +64,7 @@ class MainHandler(tornado.web.RequestHandler):
 class ViewHandler(tornado.web.RequestHandler):
     def get(self):
         device_ids = self.request.arguments.get('id', [])
-        device_ids = map(int, device_ids)
+        device_ids = list(set(map(int, device_ids)))
         inputs = {
             i[0] for i in
             (
@@ -153,10 +155,32 @@ ORDER BY 1, 2
             csvs=csvs
         )
 
+connections = []
+
+
+class DeviceHandler(websocket.WebSocketHandler):
+    def open(self):
+        print "Open conn: {}".format(self)
+        connections.append(self)
+
+    def on_close(self):
+        print "Close conn: {}".format(self)
+        connections.remove(self)
+
+    def on_message(self, message):
+        print "Conn: {} msg: {}".format(self, message)
+        msg = json.loads(message)
+        print msg
+        max_id = 0
+        for measurement in msg['measurements']:
+            max_id = max(max_id, measurement['packet_id'])
+        self.write_message(json.dumps({'packet_id': max_id, 'status': 'ok'}))
+
 
 application = tornado.web.Application([
     (r"/", MainHandler),
     (r"/view_devices", ViewHandler),
+    (r"/api", DeviceHandler),
 ])
 
 if __name__ == "__main__":
