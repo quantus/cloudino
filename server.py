@@ -165,6 +165,13 @@ unknown_connections = []
 connections = {}
 
 
+def get_ip(handler):
+    return (
+        handler.request.headers.get('X-Forwarded-For') or
+        handler.request.remote_ip
+    )
+
+
 class DeviceHandler(websocket.WebSocketHandler):
     device_id = None
 
@@ -190,7 +197,7 @@ class DeviceHandler(websocket.WebSocketHandler):
                 device = Device(
                     device_secret=msg['AUTH'],
                     device_name=msg['name'],
-                    ip_address='TODO',
+                    ip_address=get_ip(self),
                     last_seen=datetime.now()
                 )
                 session.add(device)
@@ -211,7 +218,7 @@ class DeviceHandler(websocket.WebSocketHandler):
         for measurement in msg['measurements']:
             max_id = max(max_id, measurement['packet_id'])
             device = device
-            ip_address = 'TODO'
+            ip_address = get_ip(self)
             measurement_name = measurement['name']
             measurement_value = measurement['value']
             measurement_type = measurement['type']
@@ -232,7 +239,6 @@ class DeviceHandler(websocket.WebSocketHandler):
                     measurement_type=measurement_type,
                     timestamp=timestamp
                 ))
-
 
         self.write_message(json.dumps({'packet_id': max_id, 'status': 'ok'}))
         session.commit()
