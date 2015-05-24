@@ -58,7 +58,11 @@ class Measurement(Base):
 
 class MainHandler(tornado.web.RequestHandler):
     def get(self):
-        self.render("real_index.html", devices=session.query(Device).all())
+        self.render(
+            "real_index.html",
+            devices=session.query(Device).all(),
+            connections=connections
+        )
 
 
 class ViewHandler(tornado.web.RequestHandler):
@@ -148,6 +152,8 @@ ORDER BY 1, 2
         # import pudb;pu.db
         self.render(
             "view_devices.html",
+            devices=devices,
+            connections=connections,
             inputs=inputs,
             events=events,
             measurements=measurements2,

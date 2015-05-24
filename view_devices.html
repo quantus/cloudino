@@ -6,7 +6,11 @@
 <body onload="initTable()">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dygraph/1.2/dygraph-combined.js"></script>
 
-<!-- <h1>Cabin control 1</h1> -->
+{% autoescape None %}
+<h1>Devices:</h1>
+{% for device in devices %}
+    {{ device.device_name }} {{ '<b>online</b>' if device.id in connections else '<b>offline</b> (last seen: %s)' % device.last_seen }}</br>
+{% end %}
 <h2>Measurements</h2>
 {% for key in measurements %}
 <div id="graph_{{key.replace(' ', '_')}}" style="width:80%;"></div>
@@ -29,7 +33,6 @@
 {{ event.timestamp }} device={{ event.device.device_name }} name={{ event.measurement_name }} value={{ event.measurement_value }}</br>
 {% end %}
 </div>
-{% autoescape None %}
 <script>
 function initTable(){
 

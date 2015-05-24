@@ -5,9 +5,10 @@
 </head>
 <h1>Welcome</h1>
 <h2>Select devices:</h2>
+{% autoescape None %}
 <form action="view_devices" method="GET" style="background-color:lightgray;">
 {% for device in devices %}
-<input type="checkbox" name="id" value="{{ device.id }}">{{device.device_name}}<br>
+    <input type="checkbox" name="id" value="{{ device.id }}">{{device.device_name}} </input>{{ '<b>online</b>' if device.id in connections else '<b>offline</b> (last seen: %s)' % device.last_seen }}<br>
 {% end %}
 <button>GO!</button>
 </form>
