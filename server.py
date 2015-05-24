@@ -8,6 +8,7 @@ from tornado import websocket
 from sqlalchemy import (
     create_engine,
     Column,
+    Boolean,
     Integer,
     String,
     DateTime,
@@ -35,14 +36,6 @@ class Device(Base):
     device_secret = Column(String, nullable=False)
 
     measurements = relationship('Measurement', backref='device')
-    inputs = relationship('Input', backref='device')
-
-
-class Input(Base):
-    __tablename__ = 'input'
-    id = Column(Integer, primary_key=True)
-    device_id = Column(Integer, ForeignKey('device.id'))
-    name = Column(String, nullable=False)
 
 
 class Measurement(Base):
@@ -54,6 +47,7 @@ class Measurement(Base):
     measurement_value = Column(Integer, nullable=False)
     measurement_type = Column(String, nullable=False)
     timestamp = Column(DateTime, nullable=False)
+    authority = Column(Boolean, nullable=False, default=False)
 
 
 class MainHandler(tornado.web.RequestHandler):
@@ -70,16 +64,17 @@ class ViewHandler(tornado.web.RequestHandler):
         device_ids = self.request.arguments.get('id', [])
         device_ids = list(set(map(int, device_ids)))
         all_inputs = (
-            session.query(Input)
+            session.query(Measurement)
             .filter(
-                Input.device_id.in_(device_ids)
+                Measurement.measurement_type == 'input',
+                Measurement.device_id.in_(device_ids)
             )
-            .order_by(Input.device_id, Input.id)
+            .order_by(Measurement.device_id, Measurement.id)
             .all()
         )
         inputs = {
-            name: [input for input in all_inputs if input.name == name]
-            for name in set([i.name for i in all_inputs])
+            name: [input for input in all_inputs if input.measurement_name == name]
+            for name in set([i.measurement_name for i in all_inputs])
         }
         events = (
             session.query(Measurement)
@@ -119,7 +114,8 @@ FROM t
 LEFT JOIN measurement ON
     date_trunc('hour', timestamp) = date_trunc('hour', ts) AND
     (extract(minute from timestamp)::int/15) = (extract(minute from ts)::int/15) AND
-    measurement_name = '%s'
+    measurement_name = '%s' AND
+    measurement_type = 'measurement'
 WHERE device_id IN (%s) OR device_id IS NULL
 GROUP BY 1, 2
 ORDER BY 1, 2
@@ -160,6 +156,17 @@ ORDER BY 1, 2
             measurements=measurements2,
             csvs=csvs
         )
+    def post(self):
+        arguments = self.request.arguments
+        device_id = arguments.get('id')[0]
+        commands = {}
+        for i in arguments:
+            if i.startswith('input'):
+                commands[i] = arguments.get(i)[0]
+
+
+        import pudb;pu.db
+
 
 unknown_connections = []
 connections = {}
@@ -285,7 +292,7 @@ if __name__ == "__main__":
                         ip_address='127.0.0.1',
                         measurement_name=name,
                         measurement_type='measurement',
-                        measurement_value=(m+i) % 20 + randint(-10, 10),
+                        measurement_value=str((m+i) % 20 + randint(-10, 10)),
                         timestamp=datetime.now() - timedelta(minutes=15*m)
                     ))
             for m in range(10):
@@ -306,10 +313,15 @@ if __name__ == "__main__":
                     timestamp=datetime.now() - timedelta(minutes=15*m) + timedelta(seconds=10)
                 ))
             for name in ['Heating', 'Sauna', 'Alarm system', 'Unused']:
-                session.add(Input(
+                session.add(Measurement(
                     device=device,
-                    name=name
+                    ip_address='127.0.0.1',
+                    measurement_name=name,
+                    measurement_type='input',
+                    measurement_value='0',
+                    timestamp=datetime.now() - timedelta(minutes=15*m) + timedelta(seconds=1)
                 ))
+
         session.commit()
 
     else:
