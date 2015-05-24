@@ -62,7 +62,7 @@ class MainHandler(tornado.web.RequestHandler):
 
 class ViewHandler(tornado.web.RequestHandler):
     def get(self):
-        failure_ids = map(int, self.request.arguments.get('failures', []))
+        failure_ids = map(int, self.request.arguments.get('failure', []))
         failures = session.query(Device).filter(Device.id.in_(failure_ids)).all() if failure_ids else []
         device_ids = self.request.arguments.get('id', [])
         device_ids = list(set(map(int, device_ids)))
@@ -188,7 +188,6 @@ ORDER BY 1, 2
 
         if not all_connections:
             print "No active connections, abort"
-            import pudb;pu.db
             self.redirect('.')
             self.finnish()
 
@@ -211,7 +210,7 @@ ORDER BY 1, 2
             connection.write_message(msg)
 
         print "Start sleep"
-        yield gen.sleep(3)
+        yield gen.sleep(10)
         print "End sleep"
 
         failures = []
@@ -226,7 +225,7 @@ ORDER BY 1, 2
 
     def end_post(self, failures):
         print "End, fail: %r" % failures
-        self.redirect(self.request.uri + '&'.join('failure=%s'% f for f in failures))
+        self.redirect(self.request.uri + ('&' + '&'.join('failure=%s'% f for f in failures)) if failures else '')
 
     def after_ws_response(self):
         if self not in waiting.items():
