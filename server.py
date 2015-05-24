@@ -153,7 +153,7 @@ ORDER BY 1, 2
         # import pudb;pu.db
         self.render(
             "view_devices.html",
-            devices=devices,
+            devices=session.query(Device).filter(Device.id.in_(device_ids)).all(),
             connections=connections,
             inputs=inputs,
             events=events,
@@ -212,6 +212,7 @@ class DeviceHandler(websocket.WebSocketHandler):
 
         device = session.query(Device).get(self.device_id)
         device.last_seen = datetime.now()
+        device.ip_address = get_ip(self)
         assert device
         print "Message: {} msg: {}".format(self.device_id, msg)
         max_id = 0

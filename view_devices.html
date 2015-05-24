@@ -9,7 +9,7 @@
 {% autoescape None %}
 <h1>Devices:</h1>
 {% for device in devices %}
-    {{ device.device_name }} {{ '<b>online</b>' if device.id in connections else '<b>offline</b> (last seen: %s)' % device.last_seen }}</br>
+    {{ device.device_name }} {{ '<b>online</b>' if device.id in connections else '<b>offline</b> (last seen: %s)' % device.last_seen }} on {{ device.ip_address }}</br>
 {% end %}
 <h2>Measurements</h2>
 {% for key in measurements %}
