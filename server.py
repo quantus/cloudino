@@ -69,16 +69,17 @@ class ViewHandler(tornado.web.RequestHandler):
     def get(self):
         device_ids = self.request.arguments.get('id', [])
         device_ids = list(set(map(int, device_ids)))
-        inputs = {
-            i[0] for i in
-            (
-                session.query(Input.name)
-                .filter(
-                    Input.device_id.in_(device_ids)
-                )
-                .order_by(Input.device_id, Input.id)
-                .all()
+        all_inputs = (
+            session.query(Input)
+            .filter(
+                Input.device_id.in_(device_ids)
             )
+            .order_by(Input.device_id, Input.id)
+            .all()
+        )
+        inputs = {
+            name: [input for input in all_inputs if input.name == name]
+            for name in set([i.name for i in all_inputs])
         }
         events = (
             session.query(Measurement)
