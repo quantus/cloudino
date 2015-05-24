@@ -11,6 +11,14 @@
 {% for device in devices %}
     {{ device.device_name }} {{ '<b>online</b>' if device.id in connections else '<b>offline</b> (last seen: %s)' % device.last_seen }} on {{ device.ip_address }}</br>
 {% end %}
+
+{% if failures %}
+<h1>Notice:</h1>
+{% for device in failures %}
+    {{ device.device_name }} FAILED TO CONFIRM ACTION</br>
+{% end %}
+{% end %}
+
 <h2>Measurements</h2>
 {% for key in measurements %}
 <div id="graph_{{key.replace(' ', '_')}}" style="width:80%;"></div>

@@ -1,10 +1,11 @@
 import json
 import sys
+from random import randint
 from datetime import datetime, timedelta
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 import tornado.ioloop
 import tornado.web
-from tornado import websocket
+from tornado import gen, websocket
 from sqlalchemy import (
     create_engine,
     Column,
@@ -61,8 +62,13 @@ class MainHandler(tornado.web.RequestHandler):
 
 class ViewHandler(tornado.web.RequestHandler):
     def get(self):
+        failure_ids = map(int, self.request.arguments.get('failures', []))
+        failures = session.query(Device).filter(Device.id.in_(failure_ids)).all() if failure_ids else []
         device_ids = self.request.arguments.get('id', [])
         device_ids = list(set(map(int, device_ids)))
+        if not device_ids:
+            self.redirect('/')
+            return
         all_inputs = (
             session.query(Measurement)
             .filter(
@@ -154,22 +160,81 @@ ORDER BY 1, 2
             inputs=inputs,
             events=events,
             measurements=measurements2,
-            csvs=csvs
+            csvs=csvs,
+            failures=failures
         )
+
+    @gen.coroutine
+    @tornado.web.asynchronous
     def post(self):
         arguments = self.request.arguments
-        device_id = arguments.get('id')[0]
+        device_ids = map(int, arguments.get('id'))
         commands = {}
         for i in arguments:
-            if i.startswith('input'):
-                commands[i] = arguments.get(i)[0]
+            if i.startswith('input_'):
+                name = i[len('input_'):]
+                commands[name] = int(arguments.get(i)[0])
 
+        t = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-        import pudb;pu.db
+        packet_id = randint(0, 64000)
 
+        all_connections = [
+            connections[device_id]
+            for device_id in device_ids if
+            device_id in connections
+        ]
+        print "Got post, commands: %r" % commands
+
+        if not all_connections:
+            print "No active connections, abort"
+            import pudb;pu.db
+            self.redirect('.')
+            self.finnish()
+
+        for connection in all_connections:
+            waiting[(connection, packet_id)] = self
+
+            device = session.query(Device).get(connection.device_id)
+            msg = json.dumps({
+                'AUTH': device.device_secret,
+                'control': [{
+                    'name': name,
+                    'type': 'input',
+                    'values': value,
+                    'time': t,
+                    'packet_id': packet_id,
+                    'status': 'ok'
+                } for name, value in commands.items()]
+            })
+            print "Sending to %r, %r" % (connection, msg)
+            connection.write_message(msg)
+
+        print "Start sleep"
+        yield gen.sleep(3)
+        print "End sleep"
+
+        failures = []
+        for connection in all_connections:
+            val = waiting.pop((connection, packet_id), None)
+            if val:
+                failures.append(connection.device_id)
+        if not failures:
+            print "Main thread abort, already responded"
+            return
+        self.end_post(failures)
+
+    def end_post(self, failures):
+        print "End, fail: %r" % failures
+        self.redirect(self.request.uri + '&'.join('failure=%s'% f for f in failures))
+
+    def after_ws_response(self):
+        if self not in waiting.items():
+            self.end_post([])
 
 unknown_connections = []
 connections = {}
+waiting = defaultdict(dict)
 
 
 def get_ip(handler):
@@ -222,33 +287,39 @@ class DeviceHandler(websocket.WebSocketHandler):
         device.ip_address = get_ip(self)
         assert device
         print "Message: {} msg: {}".format(self.device_id, msg)
-        max_id = 0
-        for measurement in msg['measurements']:
-            max_id = max(max_id, measurement['packet_id'])
-            device = device
-            ip_address = get_ip(self)
-            measurement_name = measurement['name']
-            measurement_value = measurement['value']
-            measurement_type = measurement['type']
-            timestamp = datetime.strptime(
-                measurement['time'],
-                '%Y-%m-%d %H:%M:%S'
-            )
-            if session.query(Measurement).filter(
-                Measurement.device == device,
-                Measurement.measurement_name == measurement_name,
-                Measurement.timestamp == timestamp
-            ).count() == 0:
-                session.add(Measurement(
-                    device=device,
-                    ip_address=ip_address,
-                    measurement_name=measurement_name,
-                    measurement_value=measurement_value,
-                    measurement_type=measurement_type,
-                    timestamp=timestamp
-                ))
 
-        self.write_message(json.dumps({'packet_id': max_id, 'status': 'ok'}))
+        if 'status' in msg:
+            packet_id = msg['packet_id']
+            handler = waiting.pop((self, packet_id), None)
+            if handler:
+                handler.after_ws_response()
+        else:
+            max_id = 0
+            for measurement in msg['measurements']:
+                max_id = max(max_id, measurement['packet_id'])
+                device = device
+                ip_address = get_ip(self)
+                measurement_name = measurement['name']
+                measurement_value = measurement['value']
+                measurement_type = measurement['type']
+                timestamp = datetime.strptime(
+                    measurement['time'],
+                    '%Y-%m-%d %H:%M:%S'
+                )
+                if session.query(Measurement).filter(
+                    Measurement.device == device,
+                    Measurement.measurement_name == measurement_name,
+                    Measurement.timestamp == timestamp
+                ).count() == 0:
+                    session.add(Measurement(
+                        device=device,
+                        ip_address=ip_address,
+                        measurement_name=measurement_name,
+                        measurement_value=measurement_value,
+                        measurement_type=measurement_type,
+                        timestamp=timestamp
+                    ))
+            self.write_message(json.dumps({'packet_id': max_id, 'status': 'ok'}))
         session.commit()
 
 
@@ -284,7 +355,6 @@ if __name__ == "__main__":
                 if i == 2 and name == 'temperature_out':
                     continue
                 for m in range(1000):
-                    from random import randint
                     if m%100 in range(2*i*10, (2*i+1)*10):
                         continue
                     session.add(Measurement(
