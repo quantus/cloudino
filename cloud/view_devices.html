@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Titleeeee</title>
+</head>
+<body onload="initTable()">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dygraph/1.2/dygraph-combined.js"></script>
+
+{% autoescape None %}
+<h1>Devices:</h1>
+{% for device in devices %}
+    {{ device.device_name }} {{ '<b>online</b>' if device.id in connections else '<b>offline</b> (last seen: %s)' % device.last_seen }} on {{ device.ip_address }}</br>
+{% end %}
+
+{% if failures %}
+<h1>Notice:</h1>
+{% for device in failures %}
+    {{ device.device_name }} FAILED TO CONFIRM ACTION</br>
+{% end %}
+{% end %}
+
+<h2>Measurements</h2>
+{% for key in measurements %}
+<div id="graph_{{key.replace(' ', '_')}}" style="width:80%;"></div>
+{% end %}
+<!-- <div id="graph1" style="width:80%;"></div>
+<div id="graph2" style="width:80%;"></div>
+ -->
+<form action="" method="POST" style="background-color:lightgray;">
+
+{% for input in inputs %}
+{{ input }}
+{% if any(map(lambda x: x.device_id in connections, inputs[input])) %}
+    <input type="radio" name="input_{{ input.replace(' ', '_') }}" value="0">On
+    <input type="radio" name="input_{{ input.replace(' ', '_') }}" value="1">Off<br>
+{% else %}
+    <input type="radio" name="input_{{ input.replace(' ', '_') }}" value="0" disabled>On
+    <input type="radio" name="input_{{ input.replace(' ', '_') }}" value="1" disabled>Off<br>
+{% end %}
+{% end %}
+<button>Save</button>
+</form>
+<h2>Events</h2>
+<div style="background-color:lightgray;">
+{% for event in events %}
+{{ event.timestamp }} device={{ event.device.device_name }} name={{ event.measurement_name }} value={{ event.measurement_value }}</br>
+{% end %}
+</div>
+<script>
+function initTable(){
+
+{% for key in csvs %}
+    g_{{ key.replace(' ', '_') }} = new Dygraph(document.getElementById("graph_{{ key.replace(' ', '_') }}"),
+    {{ csvs[key] }},
+    {
+        legend: 'always',
+        animatedZooms: true,
+        title: '{{ key }}',
+        valueRange: [-20, 30]
+    });
+{% end %}
+
+    g = new Dygraph(document.getElementById("graph1"),
+    // For possible data formats, see http://dygraphs.com/data.html
+    // The x-values could also be dates, e.g. "2012/03/15"
+    "Date,Cabin1,Cabin2\n" +
+    "2012/02/11,0,10\n" +
+    "2012/02/12,6,16\n" +
+    "2012/02/13,4,14\n" +
+    "2012/02/14,2,12\n" +
+    "2012/02/16,13,18\n" +
+    "2012/02/17,,20\n" +
+    "2012/02/18,,22\n" +
+    "2012/02/19,14,24\n" +
+    "2012/02/20,14,24\n" +
+    "2012/02/21,0,10\n" +
+    "2012/02/22,6,16\n" +
+    "2012/02/23,4,14\n" +
+    "2012/02/24,7,17\n" +
+    "2012/02/26,8,18\n" +
+    "2012/02/27,10,10\n" +
+    "2012/02/28,12,12\n" +
+    "2012/03/01,0,10\n" +
+    "2012/03/02,6,16\n" +
+    "2012/03/03,4,14\n" +
+    "2012/03/04,10,10\n" +
+    "2012/03/06,8,18\n" +
+    "2012/03/07,10,10\n" +
+    "2012/03/08,12,12\n" +
+    "2012/03/09,14,14\n" +
+    "2012/03/11,0,10\n" +
+    "2012/03/12,6,16\n" +
+    "2012/03/13,4,14\n" +
+    "2012/03/14,1, \n" +
+    "2012/03/16,8,18\n" +
+    "2012/03/17,10,10\n" +
+    "2012/03/18,12,12\n" +
+    "2012/03/19,14,14\n" +
+    "2012/03/20,14,14\n" +
+    "2012/03/21,0,10\n" +
+    "2012/03/22,6,16\n" +
+    "2012/03/23,4,14\n" +
+    "2012/03/24,5,15\n" +
+    "2012/03/26,8,18\n" +
+    "2012/03/27,10,10\n" +
+    "2012/03/28,12,12\n" +
+    "2012/03/29,14,14\n",
+    {
+        // options go here. See http://dygraphs.com/options.html
+        legend: 'always',
+        animatedZooms: true,
+        title: 'Inside temperature measurements',
+        valueRange: [-20, 30]
+        // drawCallback: function(g, is_initial) {
+        //     if (!is_initial) return;
+        //     g.setAnnotations([
+        //     {
+        //     series: "Cabin1",
+        //     x:  "2012/03/22",
+        //     shortText: "AAAAAAA aaaaa",
+        //     text: "BBBB bbbbb"
+        //     }]
+        //  );
+        // }
+        // ylabel: 'Temperature (C)',
+    });
+    g.setAnnotations([
+        {
+            series: "Cabin2",
+            x:  "2012/03/16",
+            shortText: "Boot",
+            text: "Boot Up"
+        },
+        {
+            series: "Cabin1",
+            x:  "2012/02/19",
+            shortText: "Boot",
+            text: "Boot Up"
+        }
+    ]);
+    g2 = new Dygraph(document.getElementById("graph2"),
+    // For possible data formats, see http://dygraphs.com/data.html
+    // The x-values could also be dates, e.g. "2012/03/15"
+    "Date,Cabin2\n" +
+    "2012/02/11,3\n" +
+    "2012/02/12,6\n" +
+    "2012/02/13,8\n" +
+    "2012/02/14,12\n" +
+    "2012/02/16,9\n" +
+    "2012/02/17,8\n" +
+    "2012/02/18,6\n" +
+    "2012/02/19,3\n" +
+    "2012/02/20,3\n" +
+    "2012/02/21,3\n" +
+    "2012/02/22,6\n" +
+    "2012/02/23,8\n" +
+    "2012/02/24,23\n" +
+    "2012/02/26,9\n" +
+    "2012/02/27,8\n" +
+    "2012/02/28,6\n" +
+    "2012/03/01,3\n" +
+    "2012/03/02,6\n" +
+    "2012/03/03,8\n" +
+    "2012/03/04,13\n" +
+    "2012/03/06,9\n" +
+    "2012/03/07,8\n" +
+    "2012/03/08,6\n" +
+    "2012/03/09,3\n" +
+    "2012/03/11,3\n" +
+    "2012/03/12,6\n" +
+    "2012/03/13,8\n" +
+    "2012/03/14,\n" +
+    "2012/03/16,9\n" +
+    "2012/03/17,8\n" +
+    "2012/03/18,6\n" +
+    "2012/03/19,3\n" +
+    "2012/03/20,3\n" +
+    "2012/03/21,3\n" +
+    "2012/03/22,6\n" +
+    "2012/03/23,8\n" +
+    "2012/03/24,10\n" +
+    "2012/03/26,9\n" +
+    "2012/03/27,8\n" +
+    "2012/03/28,6\n" +
+    "2012/03/29,3\n",
+    {
+        // options go here. See http://dygraphs.com/options.html
+        legend: 'always',
+        animatedZooms: true,
+        title: 'Outside temperature measurements',
+        valueRange: [-20, 30]
+        // ylabel: 'Temperature (C)',
+    });
+    g2.setAnnotations([
+        {
+            series: "Cabin2",
+            x:  "2012/03/16",
+            shortText: "Boot",
+            text: "Boot Up"
+        }
+    ])
+
+}
+</script>
+</body>
