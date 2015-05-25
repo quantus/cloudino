@@ -23,7 +23,7 @@ from sqlalchemy.orm import (
 )
 Base = declarative_base()
 
-engine = create_engine('postgresql+pg8000://localhost/cloudino')
+engine = create_engine('postgresql+pypostgresql://localhost/cloudino')
 
 session = scoped_session(sessionmaker(bind=engine))()
 
@@ -184,10 +184,10 @@ ORDER BY 1, 2
             for device_id in device_ids if
             device_id in connections
         ]
-        print "Got post, commands: %r" % commands
+        print("Got post, commands: %r" % commands)
 
         if not all_connections:
-            print "No active connections, abort"
+            print("No active connections, abort")
             self.redirect('.')
             self.finnish()
 
@@ -206,12 +206,12 @@ ORDER BY 1, 2
                     'status': 'ok'
                 } for name, value in commands.items()]
             })
-            print "Sending to %r, %r" % (connection, msg)
+            print("Sending to %r, %r" % (connection, msg))
             connection.write_message(msg)
 
-        print "Start sleep"
+        print("Start sleep")
         yield gen.sleep(10)
-        print "End sleep"
+        print("End sleep")
 
         failures = []
         for connection in all_connections:
@@ -219,12 +219,12 @@ ORDER BY 1, 2
             if val:
                 failures.append(connection.device_id)
         if not failures:
-            print "Main thread abort, already responded"
+            print("Main thread abort, already responded")
             return
         self.end_post(failures)
 
     def end_post(self, failures):
-        print "End, fail: %r" % failures
+        print("End, fail: %r" % failures)
         self.redirect(self.request.uri + ('&' + '&'.join('failure=%s'% f for f in failures)) if failures else '')
 
     def after_ws_response(self):
@@ -247,80 +247,87 @@ class DeviceHandler(websocket.WebSocketHandler):
     device_id = None
 
     def open(self):
-        print "Open conn: {}".format(self)
+        print("Open conn: {}".format(self))
         unknown_connections.append(self)
 
     def on_close(self):
         if not self.device_id:
-            print "Close unknown conn: {}".format(self)
+            print("Close unknown conn: {}".format(self))
             unknown_connections.remove(self)
         else:
-            print "Close conn: {}, {}".format(self.device_id, self)
+            print("Close conn: {}, {}".format(self.device_id, self))
             del connections[self.device_id]
 
     def on_message(self, message):
-        msg = json.loads(message)
-        if not self.device_id:
-            device = session.query(Device).filter(
-                Device.device_secret == msg['AUTH']
-            ).first()
-            if not device:
-                device = Device(
-                    device_secret=msg['AUTH'],
-                    device_name=msg['name'],
-                    ip_address=get_ip(self),
-                    last_seen=datetime.now()
-                )
-                session.add(device)
-                session.flush()
-            self.device_id = device.id
-            if self.device_id in connections:
-                ex_connection = connections[self.device_id]
-                ex_connection.close()
-                assert self.device_id not in connections
-            connections[self.device_id] = self
-            unknown_connections.remove(self)
+        print("MSG: %r" % message)
+        try:
+            msg = json.loads(message)
+            if not self.device_id:
+                device = session.query(Device).filter(
+                    Device.device_secret == msg['AUTH']
+                ).first()
+                if not device:
+                    device = Device(
+                        device_secret=msg['AUTH'],
+                        device_name=msg['name'],
+                        ip_address=get_ip(self),
+                        last_seen=datetime.now()
+                    )
+                    session.add(device)
+                    session.flush()
+                self.device_id = device.id
+                if self.device_id in connections:
+                    ex_connection = connections[self.device_id]
+                    ex_connection.close()
+                    assert self.device_id not in connections
+                connections[self.device_id] = self
+                unknown_connections.remove(self)
 
-        device = session.query(Device).get(self.device_id)
-        device.last_seen = datetime.now()
-        device.ip_address = get_ip(self)
-        assert device
-        print "Message: {} msg: {}".format(self.device_id, msg)
+            device = session.query(Device).get(self.device_id)
+            device.last_seen = datetime.now()
+            device.ip_address = get_ip(self)
+            assert device
+            print("Message: {} msg: {}".format(self.device_id, msg))
 
-        if 'status' in msg:
-            packet_id = msg['packet_id']
-            handler = waiting.pop((self, packet_id), None)
-            if handler:
-                handler.after_ws_response()
-        else:
-            max_id = 0
-            for measurement in msg['measurements']:
-                max_id = max(max_id, measurement['packet_id'])
-                device = device
-                ip_address = get_ip(self)
-                measurement_name = measurement['name']
-                measurement_value = measurement['value']
-                measurement_type = measurement['type']
-                timestamp = datetime.strptime(
-                    measurement['time'],
-                    '%Y-%m-%d %H:%M:%S'
-                )
-                if session.query(Measurement).filter(
-                    Measurement.device == device,
-                    Measurement.measurement_name == measurement_name,
-                    Measurement.timestamp == timestamp
-                ).count() == 0:
-                    session.add(Measurement(
-                        device=device,
-                        ip_address=ip_address,
-                        measurement_name=measurement_name,
-                        measurement_value=measurement_value,
-                        measurement_type=measurement_type,
-                        timestamp=timestamp
-                    ))
-            self.write_message(json.dumps({'packet_id': max_id, 'status': 'ok'}))
-        session.commit()
-
+            if 'status' in msg:
+                packet_id = msg['packet_id']
+                handler = waiting.pop((self, packet_id), None)
+                if handler:
+                    handler.after_ws_response()
+            else:
+                max_id = 0
+                for measurement in msg['measurements']:
+                    max_id = max(max_id, measurement['packet_id'])
+                    device = device
+                    ip_address = get_ip(self)
+                    measurement_name = measurement['name']
+                    measurement_value = measurement['value']
+                    measurement_type = measurement['type']
+                    timestamp = datetime.strptime(
+                        measurement['time'],
+                        '%Y-%m-%d %H:%M:%S'
+                    )
+                    if session.query(Measurement).filter(
+                        Measurement.device == device,
+                        Measurement.measurement_name == measurement_name,
+                        Measurement.timestamp == timestamp
+                    ).count() == 0:
+                        session.add(Measurement(
+                            device=device,
+                            ip_address=ip_address,
+                            measurement_name=measurement_name,
+                            measurement_value=measurement_value,
+                            measurement_type=measurement_type,
+                            timestamp=timestamp
+                        ))
+                self.write_message(json.dumps({'packet_id': max_id, 'status': 'ok'}))
+            session.commit()
+            return
+        except ValueError:
+            print("Not valid json, ignored: %r" % message)
+        except KeyError:
+            print("Missing needed values, ignored: %r" % message)
+        session.rollback()
 
 application = tornado.web.Application([
     (r"/", MainHandler),
@@ -330,10 +337,10 @@ application = tornado.web.Application([
 
 if __name__ == "__main__":
     if '-create' in sys.argv:
-        print "Creating tables"
+        print("Creating tables")
         Base.metadata.create_all(engine)
     elif '-dummy' in sys.argv:
-        print "Creating dummy data"
+        print("Creating dummy data")
         for i in range(3):
             device = Device(
                 device_name='device %d' % i,
@@ -394,9 +401,9 @@ if __name__ == "__main__":
         session.commit()
 
     else:
-        print "Server start"
+        print("Server start")
         application.listen(8888)
         try:
             tornado.ioloop.IOLoop.instance().start()
         except KeyboardInterrupt:
-            print "Shutdown"
+            print("Shutdown")

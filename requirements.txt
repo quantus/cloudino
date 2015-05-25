@@ -1,4 +1,4 @@
-pg8000==1.10.2
+py-postgresql==1.1.0
 SQLAlchemy==1.0.4
 tornado==4.1
 websocket-client==0.31.0
