@@ -338,7 +338,6 @@ application = tornado.web.Application([
     (r"/view_devices", ViewHandler),
     (r"/api", DeviceHandler),
 ])
-
 if __name__ == "__main__":
     if '-create' in sys.argv:
         print("Creating tables")
@@ -358,7 +357,7 @@ if __name__ == "__main__":
                 ip_address='127.0.0.1',
                 measurement_name='Bootup',
                 measurement_type='event',
-                measurement_value='1',
+                measurement_value=1,
                 timestamp=datetime.now() - timedelta(minutes=15*101)
             ))
             for name in ['temperature_in', 'temperature_out']:
@@ -372,7 +371,7 @@ if __name__ == "__main__":
                         ip_address='127.0.0.1',
                         measurement_name=name,
                         measurement_type='measurement',
-                        measurement_value=str((m+i) % 20 + randint(-10, 10)),
+                        measurement_value=(m+i) % 20 + randint(-10, 10),
                         timestamp=datetime.now() - timedelta(minutes=15*m)
                     ))
             for m in range(10):
@@ -381,7 +380,7 @@ if __name__ == "__main__":
                     ip_address='127.0.0.1',
                     measurement_name='Door sensor 1',
                     measurement_type='event',
-                    measurement_value='1',
+                    measurement_value=1,
                     timestamp=datetime.now() - timedelta(minutes=15*m)
                 ))
                 session.add(Measurement(
@@ -389,7 +388,7 @@ if __name__ == "__main__":
                     ip_address='127.0.0.1',
                     measurement_name='Door sensor 1',
                     measurement_type='event',
-                    measurement_value='0',
+                    measurement_value=0,
                     timestamp=datetime.now() - timedelta(minutes=15*m) + timedelta(seconds=10)
                 ))
             for name in ['Heating', 'Sauna', 'Alarm system', 'Unused']:
@@ -398,7 +397,7 @@ if __name__ == "__main__":
                     ip_address='127.0.0.1',
                     measurement_name=name,
                     measurement_type='input',
-                    measurement_value='0',
+                    measurement_value=0,
                     timestamp=datetime.now() - timedelta(minutes=15*m) + timedelta(seconds=1)
                 ))
 
