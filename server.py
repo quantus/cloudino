@@ -363,7 +363,7 @@ if __name__ == "__main__":
             for name in ['temperature_in', 'temperature_out']:
                 if i == 2 and name == 'temperature_out':
                     continue
-                for m in range(1000):
+                for m in range(100):
                     if m%100 in range(2*i*10, (2*i+1)*10):
                         continue
                     session.add(Measurement(
