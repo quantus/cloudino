@@ -1,5 +1,6 @@
 import json
 import sys
+import os
 from random import randint
 from datetime import datetime, timedelta
 from collections import OrderedDict, defaultdict
@@ -23,7 +24,10 @@ from sqlalchemy.orm import (
 )
 Base = declarative_base()
 
-engine = create_engine('postgresql+pypostgresql://localhost/cloudino')
+engine = create_engine(os.environ.get(
+    'DATABASE_URI',
+    'postgresql+pypostgresql://localhost/cloudino'
+))
 
 session = scoped_session(sessionmaker(bind=engine))()
 
