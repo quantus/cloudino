@@ -11,6 +11,11 @@
 
 #include "WebSocketClient.h"
 
+template <typename T, size_t N>
+inline size_t SizeOfArray( const T(&)[ N ] ){
+  return N;
+}
+
 GSMClient client;
 GPRS gprs;
 GSM gsmAccess;
@@ -25,217 +30,227 @@ GSM gsmAccess;
 
 WebSocketClient webSocketClient;
 
-void debugBlink(int blinkcount){
-    int port = 34;
-    pinMode(port, OUTPUT);
-    digitalWrite(port, HIGH);
+const int ledPins[] = {22,24,26,28,30,32,34};
+const int debugLed = ledPins[0]; // the first one used as debug led
+const int eventPins[] = {50,51,52,53};
+const String eventName[] ={"AA","BB","CC","DD"};
+const int measurementPins[] = {A6};
+const String measurementName[] ={"XX"};
+
+const int eventPinSize = SizeOfArray( eventPins );
+const int measurementPinSize = SizeOfArray( measurementPins );
+const int ledPinSize = SizeOfArray( ledPins );
+
+boolean makeconnection(); 
+
+void debugBlink(const int debugLed, const int errorcode){
+    digitalWrite(debugLed, LOW);
     delay(1000);
-    for(int i=0;i<blinkcount;i++){
-      digitalWrite(port, LOW);
+    for(int i=0;i<errorcode;i++){
+      digitalWrite(debugLed, HIGH);
       delay(300);
-      digitalWrite(port, HIGH);
+      digitalWrite(debugLed, LOW);
       delay(300);      
     }
-    digitalWrite(port, LOW);
+    digitalWrite(debugLed, HIGH);
     delay(1000);
-    pinMode(port, INPUT);
 }
 
-void setLed(int port){
-  pinMode(port, OUTPUT);
-  digitalWrite(port, HIGH);
-  //pinMode(port, INPUT);
-}
 
 void startupLeds(){
-    delay(500);
-  // initialize serial communications and wait for port to open:
-  for (int e=0; e<2; e++){
-    for(int i=22; i<=34; i++){
-      pinMode(i, OUTPUT);
-      digitalWrite(i, HIGH);
-      delay(100);
-    }
-    for(int i=22; i<=34; i++){
-      digitalWrite(i, LOW);
-      pinMode(i, INPUT);
-      delay(100);
-    }
-  }
+   delay(500);
+
+   for(int i=0; i<ledPinSize; i++){
+     digitalWrite(ledPins[i], HIGH);
+     delay(100);
+   }
+   for(int i=0; i<ledPinSize; i++){
+     digitalWrite(ledPins[i], LOW);
+     delay(100);
+   }
 }
+
+void initializePINs(){
+  for(int i=0; i<ledPinSize; i++){
+      pinMode(ledPins[i], OUTPUT);
+      digitalWrite(ledPins[i], LOW);
+  }
+  for(int i=0; i<eventPinSize; i++)
+      pinMode(eventPins[i], INPUT);
+  for(int i=0; i<measurementPinSize; i++)
+      pinMode(measurementPins[i], INPUT);  
+}
+
+void initializeGSM(){ // issues? http://forum.arduino.cc/index.php?topic=270551.0
+    // After starting the modem with GSM.begin() attach the shield to the GPRS network with thebe APN, login and password
+  while(1){
+    if((gsmAccess.begin(PINNUMBER)==GSM_READY) &&
+      (gprs.attachGPRS(GPRS_APN, GPRS_LOGIN, GPRS_PASSWORD)==GPRS_READY)){
+      break;
+    } 
+    debugBlink(debugLed,3);
+  }
+  delay(1000);
+}
+
 
 void setup() {  
+  initializePINs();
 
   startupLeds();
-  setLed(22); 
-  debugBlink(1);
+  startupLeds();
   
-  for(int i=50; i<=53; i++) // listen events
-    pinMode(i, INPUT);
-    
-  
-  
-  // connection state
-  boolean notConnected = true;
+  debugBlink(debugLed,1);
 
-  // After starting the modem with GSM.begin()
-  // attach the shield to the GPRS network with thebe APN, login and password
-  while(notConnected)
-  {
-    if((gsmAccess.begin(PINNUMBER)==GSM_READY) &&
-      (gprs.attachGPRS(GPRS_APN, GPRS_LOGIN, GPRS_PASSWORD)==GPRS_READY))
-      notConnected = false;
-    else
-    {
-      debugBlink(3);
-    }
-  }
-  setLed(24);
-  //Serial.begin(9600);
-  /*SC16IS750.begin();
+  initializeGSM();
+  digitalWrite(ledPins[1], HIGH); //Serial.println("GSM successful");
   
-  WiFly.setUart(&SC16IS750);
-  
-  WiFly.begin();
-  
-  // This is for an unsecured network
-  // For a WPA1/2 network use auth 3, and in another command send 'set wlan phrase PASSWORD'
-  // For a WEP network use auth 2, and in another command send 'set wlan key KEY'
-  WiFly.sendCommand(F("set wlan auth 1"));
-  WiFly.sendCommand(F("set wlan channel 0"));
-  WiFly.sendCommand(F("set ip dhcp 1"));
-  
-  Serial.println(F("Joining WiFi network..."));
-  
-
-  // Here is where you set the network name to join
-  if (!WiFly.sendCommand(F("join arduino_wifi"), "Associated!", 20000, false)) {    
-    Serial.println(F("Association failed."));
-    while (1) {
-      // Hang on failure.
-    }
-  }
-  
-  if (!WiFly.waitForResponse("DHCP in", 10000)) {  
-    Serial.println(F("DHCP failed."));
-    while (1) {
-      // Hang on failure.
-    }
-  }*/
-
-  // This is how you get the local IP as an IPAddress object
-  //Serial.println(WiFly.localIP());
-  
-  // This delay is needed to let the WiFly respond properly
-  delay(1000);
-
-  // Connect to the websocket server
   while(1){
-  if(client.connect("173.255.197.142", 80)) {
-    //Serial.println("Connected");
-    break;
-    client.println("GET /asede HTTP/1.1");
-    client.println("Host: 04b5bc2b.ngrok.io");
-    client.println("Connection: Close");
-    client.println();
-  } else {
-    //Serial.println("Connection failed.");
-    debugBlink(6);
-  }
-  }
-  
-  setLed(26);
-
-
-  
-
-  // Handshake with the server
-  webSocketClient.path = "/api";
-  webSocketClient.host = "04b5bc2b.ngrok.io";
-  
-  // JÄÄ TÄHÄN JUMIIN
-  
-  if (webSocketClient.handshake(client)) {
-    //Serial.println("Handshake successful");
-    //client.print("Handshake OK");
-  } else {
-    //Serial.println("Handshake failed.");
-    //client.print("Handshake NOK");
-    while(1) {
-      // Hang on failure
-      debugBlink(15);
-    }  
+    if (makeconnection())
+      break; // connected
   }
 }
+boolean makeconnection(){
+  webSocketClient.path = "/api";
+  webSocketClient.host = "04b5bc2b.ngrok.io";
 
-class event{
-  event( int _packetid, int _type, String _time, int _value, int _pin, int _pin_status ){
-    packetid = _packetid;
-    type = _type;
-    time = _time;
-    value = _value;
-    pin = _pin;
-    pin_status = _pin_status;
+  digitalWrite(ledPins[2], LOW);
+  digitalWrite(ledPins[3], LOW);
+  digitalWrite(ledPins[4], LOW);
+  digitalWrite(ledPins[5], LOW);
+
+  
+  if(client.connect("173.255.197.142", 80)) {
+    digitalWrite(ledPins[2], HIGH); //Serial.println("Connection successful");
+    if (webSocketClient.handshake(client)){
+        digitalWrite(ledPins[3], HIGH); //Serial.println("Handshake successful");
+        return true;
+    } else {
+        debugBlink(debugLed,15); //Serial.println("Handshake failed.");
+        client.stop();
+    }
+  } else {
+      debugBlink(debugLed,6);  //Serial.println("Connection failed.");
   }
-   int packetid;
-   int type; // measurement / event
-   String time;
+  return false;
+
+}
+
+class record{
+   public:
+   record(){}
+   record(bool _type, int _value, int _pin, String _time){
+     type = _type;
+     value = _value;
+     pin = _pin;
+     time = _time;
+   }
+   bool type; // measurement / event
    int value;
    int pin;
-   int pin_status; // on / off
-
+   String time;
 };
 
+record history[10];
+int history_iterator = 0;
 int pinStatus[100] = {0};
+
+void isBufferFull(){
+    if (10 <= history_iterator){
+        history_iterator = 10;
+        debugBlink(debugLed,10);    //Serial.println("Sorry. The buffer is full.");
+    }
+}
+
+void fillBuffer(){
+    for(int i=0; i<eventPinSize; i++){
+        const int PIN = eventPins[i];
+        int s = digitalRead(PIN);
+  
+        if (pinStatus[PIN] != s){
+             record r = record(true, s, PIN, "0");            
+             history[min(history_iterator++, 10)] = r;
+             isBufferFull();
+             pinStatus[PIN] = s;
+        }
+    }
+    for(int i=0; i<measurementPinSize; i++){
+        const int PIN = measurementPins[i];
+        int analogValue = analogRead(PIN);
+  
+        if (pinStatus[PIN] != analogValue){
+           record r = record(false, analogValue, PIN, "0");
+           history[min(history_iterator++, 10)] = r;
+           isBufferFull();
+           pinStatus[PIN] = analogValue;
+        }
+    }
+}
+
+String pinToName(const int targetPIN){
+    for(int i=0; i<eventPinSize; i++){
+        const int PIN = eventPins[i];
+        if (PIN == targetPIN){
+           return eventName[i];
+        }
+    }
+    for(int i=0; i<measurementPinSize; i++){
+        const int PIN = measurementPins[i];
+        if (PIN == targetPIN){
+           return measurementName[i];
+        }
+    }
+    return "";
+}
 
 void loop() {
   String data;
-  setLed(28);
+  
+  fillBuffer();
   
   if (client.connected()) {
     
     webSocketClient.getData(data);
 
     if (data.length() > 0) {
-      //Serial.print("Received data: ");
-      //Serial.println(data);
+      //Serial.println("Received data: " + data);
+        digitalWrite(ledPins[4], HIGH);
     }
-    setLed(30);
     
-    // capture the value of analog 1, send it along
-    //pinMode(1, INPUT);
-    //data = String(analogRead(1));
-    data = "{}";
-    //webSocketClient.sendData(data);
-    
-    for(int i=50; i<=53; i++){
-      int s = digitalRead(i);
-      if (pinStatus[i] != s){
-         if (s == HIGH){
-           webSocketClient.sendData("{HIGH"+String(i)+"}");
-         } else {
-           webSocketClient.sendData("{LOW"+String(i)+"}");
-         }
-         pinStatus[i] = s;
+    if (history_iterator){
+      data = String("{") + String("‘AUTH’:’SECRET_KEY2000005’,")
+      + String("‘name:’JMT1 device’,")
+      + String("‘measurements’: [");
+      
+      for (int i=0; i<history_iterator;  i++){
+        const record R = history[i];
+        String message = "{";
+        if (R.type) message += "\"type\":\"event\"";
+        else message += "\"type\":\"measurement\", ";
+        message += "\"value\":\""+ String(R.value) +"\", ";
+        message += "\"pin\":\""+ String(R.pin) +"\", ";
+        message += "\"time\":\""+ R.time +"\", ";
+        message += "\"name\":\""+ pinToName(R.pin) +"\", ";
+        
+        message += "}, ";
+        data += message;
       }
+      data += "]}";
+      webSocketClient.sendData(data);
+      history_iterator = 0;
+     
+      digitalWrite(ledPins[5], HIGH);
     }
-    
-    int analogValue = analogRead(A6);
-    webSocketClient.sendData("{ANA"+String(analogValue)+"}");
-    
-    //webSocketClient.sendData("{}");
-    setLed(32);
-    
   } else {
-    
-    //Serial.println("Client disconnected.");3
-    while (1) {
-      // Hang on disconnect.
-      debugBlink(10);
+    debugBlink(debugLed,10);    //Serial.println("Connection disconnected.");
+    while(1){
+      if (makeconnection())
+        break; // connected
+      delay(3000);
     }
   }
   
   
   // wait to fully let the client disconnect
-  delay(3000);
+  // delay(3000); // wtf t:toni
 }
