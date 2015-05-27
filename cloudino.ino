@@ -249,6 +249,9 @@ void loop() {
           setTime(pctime);
           // debugBlink(debugLed,pctime);
         }
+        if (data.indexOf("SET ") != -1){
+          
+        }
           
 
         
