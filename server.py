@@ -2,6 +2,7 @@ import json
 import sys
 import os
 from random import randint
+import time
 from datetime import datetime, timedelta
 from collections import OrderedDict, defaultdict
 import tornado.ioloop
@@ -253,6 +254,9 @@ class DeviceHandler(websocket.WebSocketHandler):
     def open(self):
         print("Open conn: {}".format(self))
         unknown_connections.append(self)
+        timestamp = str(int(time.time()))
+        self.write_message("TIME " + timestamp)
+        print ("SENDING TIMESTAMP: %s" % timestamp)
 
     def on_close(self):
         if not self.device_id:
@@ -260,7 +264,8 @@ class DeviceHandler(websocket.WebSocketHandler):
             unknown_connections.remove(self)
         else:
             print("Close conn: {}, {}".format(self.device_id, self))
-            del connections[self.device_id]
+            if connections[self.device_id] == self:
+                del connections[self.device_id]
 
     def on_message(self, message):
         print("MSG: %r" % message)
@@ -278,20 +283,26 @@ class DeviceHandler(websocket.WebSocketHandler):
                         last_seen=datetime.now()
                     )
                     session.add(device)
-                    session.flush()
+                    session.commit()
                 self.device_id = device.id
+                if not self.device_id:
+                    import pudb
+                    pu.db
+                assert self.device_id
                 if self.device_id in connections:
                     ex_connection = connections[self.device_id]
                     ex_connection.close()
-                    assert self.device_id not in connections
                 connections[self.device_id] = self
                 unknown_connections.remove(self)
 
             device = session.query(Device).get(self.device_id)
+            if not self.device_id or not device:
+                import pudb
+                pu.db
+            assert device
             device.last_seen = datetime.now()
             device.ip_address = get_ip(self)
-            assert device
-            print("Message: {} msg: {}".format(self.device_id, msg))
+            # print("Message: {} msg: {}".format(self.device_id, msg))
 
             if 'status' in msg:
                 packet_id = msg['packet_id']
@@ -327,10 +338,10 @@ class DeviceHandler(websocket.WebSocketHandler):
                 self.write_message(json.dumps({'packet_id': max_id, 'status': 'ok'}))
             session.commit()
             return
-        except ValueError:
-            print("Not valid json, ignored: %r" % message)
-        except KeyError:
-            print("Missing needed values, ignored: %r" % message)
+        except ValueError as e:
+            print("Error(%r), ignored: %r" % (e, message))
+        except KeyError as e:
+            print("Missing needed values(%r), ignored: %r" % (e, message))
         session.rollback()
 
 application = tornado.web.Application([
