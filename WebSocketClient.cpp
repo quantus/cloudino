@@ -32,7 +32,9 @@ bool WebSocketClient::handshake(Client &client) {
 #ifdef DEBUGGING
             Serial.println(F("Client connected")); 
 #endif
+        debugBlink2(1);
         if (analyzeRequest()) {
+          debugBlink2(2);
 #ifdef DEBUGGING
                 Serial.println(F("Websocket established"));
 #endif
@@ -63,7 +65,7 @@ bool WebSocketClient::analyzeRequest() {
     char keyStart[17];
     char b64Key[25];
     String key = "------------------------";
-
+debugBlink2(3);
     randomSeed(analogRead(0));
 
     for (int i=0; i<16; ++i) {
@@ -71,6 +73,7 @@ bool WebSocketClient::analyzeRequest() {
     }
 
     base64_encode(b64Key, keyStart, 16);
+    debugBlink2(4);
 
     for (int i=0; i<24; ++i) {
         key[i] = b64Key[i];
@@ -79,7 +82,7 @@ bool WebSocketClient::analyzeRequest() {
 #ifdef DEBUGGING
     Serial.println(F("Sending websocket upgrade headers"));
 #endif    
-	debugBlink2(8);
+	debugBlink2(5);
     socket_client->print(F("GET "));
     socket_client->print(path);
     socket_client->print(F(" HTTP/1.1\r\n"));
@@ -96,7 +99,7 @@ bool WebSocketClient::analyzeRequest() {
     socket_client->print(CRLF);
     socket_client->print(F("Sec-WebSocket-Version: 13\r\n"));
     socket_client->print(CRLF);
-	debugBlink2(10);
+	debugBlink2(6);
 
 #ifdef DEBUGGING
     Serial.println(F("Analyzing response headers"));
@@ -105,6 +108,7 @@ bool WebSocketClient::analyzeRequest() {
     while (socket_client->connected() && !socket_client->available()) {
         delay(100);
         //Serial.println("Waiting...");
+        debugBlink2(2);
     }
 
     // TODO: More robust string extraction
@@ -113,7 +117,7 @@ bool WebSocketClient::analyzeRequest() {
         temp += (char)bite;
 
         if ((char)bite == '\n') {
-          debugBlink2(1);
+          //debugBlink2(1);
 #ifdef DEBUGGING
             Serial.print("Got Header: " + temp);
 #endif
@@ -122,7 +126,7 @@ bool WebSocketClient::analyzeRequest() {
             } else if (temp.startsWith("Sec-WebSocket-Accept: ")) {
                 serverKey = temp.substring(22,temp.length() - 2); // Don't save last CR+LF
             }
-            if (temp == "\r\n" && !socket_client->available())
+            if (temp == "\r\n" /*&& !socket_client->available()*/)
                 break;
             temp = "";
             		
@@ -134,7 +138,7 @@ bool WebSocketClient::analyzeRequest() {
         }
     }
     
-    debugBlink2(55);
+    debugBlink2(9);
 
     key += "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
     uint8_t *hash;
@@ -151,6 +155,8 @@ bool WebSocketClient::analyzeRequest() {
     result[20] = '\0';
 
     base64_encode(b64Result, result, 20);
+
+    debugBlink2(10);
 
     // if the keys match, good to go
     return serverKey.equals(String(b64Result));
