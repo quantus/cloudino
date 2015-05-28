@@ -4,6 +4,8 @@
 //#include <WiFly.h>
 #include "Time.h"  
 #include <stdlib.h>
+#include <avr/interrupt.h>  
+#include <avr/io.h>
 
 // Here we define a maximum framelength to 64 bytes. Default is 256.
 #define MAX_FRAME_LENGTH 64
@@ -32,7 +34,10 @@ GSM gsmAccess;
 
 WebSocketClient webSocketClient;
 
+const String authtoken = "SECRET_KEY2000005";
+const String devicename = "JMT1 device";
 const int ledPins[] = {22,24,26,28,30,32,34};
+const String ledName[] = {"LED22","LED24","LED26","LED28","LED30","LED32","LED34"};
 const int debugLed = ledPins[0]; // the first one used as debug led
 const int eventPins[] = {50,51,52,53};
 const String eventName[] ={"Event50","Event51","Event52","Event53"};
@@ -42,11 +47,17 @@ const String measurementName[] ={"MeasurementA6"};
 const int eventPinSize = SizeOfArray( eventPins );
 const int measurementPinSize = SizeOfArray( measurementPins );
 const int ledPinSize = SizeOfArray( ledPins );
+int pinStatus[100] = {0};
 
 boolean makeconnection(); 
 
 void debugBlink(const int debugLed, const unsigned long errorcode){
-    digitalWrite(debugLed, LOW);
+    for (int i=1; i<10; i++){
+        digitalWrite(debugLed, LOW);
+        delay(10+i*5);
+        digitalWrite(debugLed, HIGH);
+        delay(10+i*5);
+    }
     delay(1000);
     for(unsigned long i=0;i<errorcode;i++){
       digitalWrite(debugLed, HIGH);
@@ -55,7 +66,11 @@ void debugBlink(const int debugLed, const unsigned long errorcode){
       delay(300);      
     }
     digitalWrite(debugLed, HIGH);
-    delay(1000);
+}
+
+
+void debugRequest(String message){
+      webSocketClient.sendData("{\"message\":\""+message+"\"}");
 }
 
 
@@ -96,30 +111,87 @@ void initializeGSM(){ // issues? http://forum.arduino.cc/index.php?topic=270551.
 }
 
 
+void bootEvent(){
+      String data = String("{") + String("\"AUTH\":\""+authtoken+"\",")
+      + String("\"name\":\""+devicename+"\",")
+      + String("\"measurements\": [");
+      
+        data += "{";
+        data += "\"type\":\"event\", ";
+        data += "\"packet_id\":0, ";
+        data += "\"value\":0, ";
+        data += "\"time\":\"\", ";
+        data += "\"name\":\"Boot\", ";
+        
+      data += String("\"names\": {");      
+      data += "\"input_names\":[";
+      for(int i=0; i<ledPinSize; i++){
+        data += (i==0)?"\""+ledName[i]+"\"":(",\""+ledName[i]+"\"");
+      }
+      data += "],\"event_names\":[";
+      for(int i=0; i<eventPinSize; i++){
+        data += (i==0)?"\""+eventName[i]+"\"":(",\""+eventName[i]+"\"");
+      }
+      data += "],\"measurement_names\":[";
+      for(int i=0; i<measurementPinSize; i++){
+        data += (i==0)?"\""+measurementName[i]+"\"":(",\""+measurementName[i]+"\"");
+      }
+      data += "]}}]";
+      webSocketClient.sendData(data);  
+}
+
+void initializeTimer(){
+  //Setup Timer2 to fire every 1ms
+  TCCR2B = 0x00;        //Disbale Timer2 while we set it up
+  TCNT2  = 130;         //Reset Timer Count to 130 out of 255
+  TIFR2  = 0x00;        //Timer2 INT Flag Reg: Clear Timer Overflow Flag
+  TIMSK2 = 0x01;        //Timer2 INT Reg: Timer2 Overflow Interrupt Enable
+  TCCR2A = 0x00;        //Timer2 Control Reg A: Normal port operation, Wave Gen Mode normal
+  TCCR2B = 0x05;        //Timer2 Control Reg B: Timer Prescaler set to 128  
+}
+
+
+unsigned long int timerCounter = 0;
+
+//Timer2 Overflow Interrupt Vector, called every 1ms
+ISR(TIMER2_OVF_vect) {
+  const unsigned long int seconds = 60*15;
+  timerCounter++;
+  if(timerCounter > 999*seconds){ // act every 15min
+    for(int i=0; i<measurementPinSize; i++){
+      pinStatus[measurementPins[i]]=-1; // trigger to send measurement events
+    }
+    timerCounter = 0;
+  }
+  TCNT2 = 130;           //Reset Timer to 130 out of 255
+  TIFR2 = 0x00;          //Timer2 INT Flag Reg: Clear Timer Overflow Flag
+};  
+
 void setup() {  
   initializePINs();
 
   startupLeds();
   startupLeds();
   
-  debugBlink(debugLed,1);
+  debugBlink(debugLed,0);
 
   unsigned long pctime;
-  const unsigned long DEFAULT_TIME = 1432734526; //1357041600; // Jan 1 2013
+  const unsigned long DEFAULT_TIME = 1357041600; //1357041600; // Jan 1 2013
   setTime(DEFAULT_TIME);
 
   initializeGSM();
   digitalWrite(ledPins[1], HIGH); //Serial.println("GSM successful");
-
   
   while(1){
     if (makeconnection())
       break; // connected
   }
+  bootEvent();
+  initializeTimer();
 }
 boolean makeconnection(){
   webSocketClient.path = "/api";
-  webSocketClient.host = "04b5bc2b.ngrok.io";
+  webSocketClient.host = "892c05e9.ngrok.io"; // "04b5bc2b.ngrok.io";
 
   digitalWrite(ledPins[2], LOW);
   digitalWrite(ledPins[3], LOW);
@@ -137,7 +209,7 @@ boolean makeconnection(){
         client.stop();
     }
   } else {
-      debugBlink(debugLed,6);  //Serial.println("Connection failed.");
+      debugBlink(debugLed,2);  //Serial.println("Connection failed.");
   }
   return false;
 
@@ -158,10 +230,9 @@ class record{
    String time;
 };
  
-const int history_size = 10;
+const int history_size = 100;
 record history[history_size];
 int history_iterator = 0;
-int pinStatus[100] = {0};
 
 void isBufferFull(){
     if (history_size-1 <= history_iterator){
@@ -225,14 +296,29 @@ String pinToName(const int targetPIN){
            return measurementName[i];
         }
     }
+    for(int i=0; i<ledPinSize; i++){
+        const int PIN = ledPins[i];
+        if (PIN == targetPIN){
+           return ledName[i];
+        }
+    }
     return "";
 }
+/*
+{  "names":[
+     "input_names":{"A","b","c"},
+     "event_names":{"A","b","c"},
+     "measurement_names":{"A","b","c"}
+   ]
+}
+*/
+
 
 void loop() {
   String data;
   
   fillBuffer();
-  debugBlink(34,1);
+  debugBlink(34,0);
   
   if (client.connected()) {
     
@@ -242,28 +328,39 @@ void loop() {
       //Serial.println("Received data: " + data);
         digitalWrite(ledPins[4], HIGH);
 
-        if (data.indexOf("TIME ") != -1){
+        const char *lines = data.c_str();
+        unsigned long pctime=0;
+        int offset = 0, pin=0, mode=0;
+        for (int i=0; i<50; i++){
+          if (sscanf(lines, "SET %d %d%n", &pin, &mode, &offset)==2){ // PIN pitäs olla pin_name
+            lines += offset+1;
+            digitalWrite(pin, mode);
+            //printf("read: command=SET, x=%d, y=%d; offset = %5d, val=%d\n", x,y, offset, val);
+            continue;
+          }
+          if (sscanf(lines, "TIME %lu%n", &pctime, &offset)==1){
+            lines += offset+1;
+            // debugRequest("read: command=TIME, x=" + String(pctime));
+            setTime(pctime);
+            continue;
+          }
+    
+          break;
+        }
 
-          String strtime = data.substring(5);
-          unsigned long pctime = strtoul(strtime.c_str(),0,0);
-          setTime(pctime);
-          // debugBlink(debugLed,pctime);
-        }
-        if (data.indexOf("SET ") != -1){
-          
-        }
+        
           
 
         
-    } // SET 10 1 // TIME 24525
+    }
 
     static int packet_counter = 0;
 
     // debugBlink(34,history_iterator); // wtf
     
     if (history_iterator){
-      data = String("{") + String("\"AUTH\":\"SECRET_KEY2000005\",")
-      + String("\"name\":\"JMT1 device\",")
+      data = String("{") + String("\"AUTH\":\""+authtoken+"\",")
+      + String("\"name\":\""+devicename+"\",")
       + String("\"measurements\": [");
       
       for (int i=0; i<history_iterator;  i++){
@@ -278,6 +375,8 @@ void loop() {
         message += "\"name\":\""+ pinToName(R.pin) +"\" ";
         
         message += "}";
+//        debugRequest(message);
+        
         data += message;
       }
       
@@ -288,12 +387,9 @@ void loop() {
       digitalWrite(ledPins[5], HIGH);
     }
   } else {
-    debugBlink(debugLed,10);    //Serial.println("Connection disconnected.");
-    while(1){
-      if (makeconnection())
-        break; // connected
-      delay(3000);
-    }
+    // debugBlink(debugLed,10);    //Serial.println("Connection disconnected.");
+    if (makeconnection())
+      bootEvent();
   }
   
   
