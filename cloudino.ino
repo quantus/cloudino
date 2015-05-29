@@ -110,7 +110,42 @@ void initializeGSM(){ // issues? http://forum.arduino.cc/index.php?topic=270551.
   delay(1000);
 }
 
+/*
+{
+   "AUTH":"SECRET_KEY2000005",
+   "name":"JMT1 device",
+   "measurements":[
+      {
+         "type":"event",
+         "packet_id":0,
+         "value":0,
+         "time":"",
+         "name":"Boot",
+         "names":{
+            "input_names":[
+               "LED22",
+               "LED24",
+               "LED26",
+               "LED28",
+               "LED30",
+               "LED32",
+               "LED34"
+            ],
+            "event_names":[
+               "Event50",
+               "Event51",
+               "Event52",
+               "Event53"
+            ],
+            "measurement_names":[
+               "MeasurementA6"
+            ]
+         }
+      }
+   ]
+}
 
+*/
 void bootEvent(){
       String data = String("{") + String("\"AUTH\":\""+authtoken+"\",")
       + String("\"name\":\""+devicename+"\",")
@@ -329,9 +364,10 @@ void loop() {
         digitalWrite(ledPins[4], HIGH);
 
         const char *lines = data.c_str();
+        // lue ekalta riviltä lähetyksen id\n
         unsigned long pctime=0;
         int offset = 0, pin=0, mode=0;
-        for (int i=0; i<50; i++){
+        for (int i=0; i<100; i++){
           if (sscanf(lines, "SET %d %d%n", &pin, &mode, &offset)==2){ // PIN pitäs olla pin_name
             lines += offset+1;
             digitalWrite(pin, mode);
@@ -347,6 +383,10 @@ void loop() {
     
           break;
         }
+        int packet_id = 123;
+        String ack = "{\"status\":\"ok\",\"packet_id\":"+String(packet_id)+"}"
+        webSocketClient.sendData(data);
+        // kuittaus {"status":"ok","packet_id":123}
 
         
           
