@@ -30,13 +30,8 @@
 
 {% for input in inputs %}
 {{ input }}
-{% if any(map(lambda x: x.device_id in connections, inputs[input])) %}
     <input type="radio" name="input_{{ input.replace(' ', '_') }}" value="0">On
     <input type="radio" name="input_{{ input.replace(' ', '_') }}" value="1">Off<br>
-{% else %}
-    <input type="radio" name="input_{{ input.replace(' ', '_') }}" value="0" disabled>On
-    <input type="radio" name="input_{{ input.replace(' ', '_') }}" value="1" disabled>Off<br>
-{% end %}
 {% end %}
 <button>Save</button>
 </form>

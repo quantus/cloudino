@@ -15,7 +15,8 @@ from sqlalchemy import (
     Integer,
     String,
     DateTime,
-    ForeignKey
+    ForeignKey,
+    desc
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import (
@@ -90,7 +91,7 @@ class ViewHandler(tornado.web.RequestHandler):
         events = (
             session.query(Measurement)
             .filter(
-                Measurement.measurement_type == 'event',
+                Measurement.measurement_type.in_(['event', 'input']),
                 Measurement.device_id.in_(device_ids)
             )
             .order_by(Measurement.timestamp)
@@ -174,6 +175,7 @@ ORDER BY 1, 2
     def post(self):
         arguments = self.request.arguments
         device_ids = map(int, arguments.get('id'))
+        devices = [session.query(Device).get(i) for i in device_ids]
         commands = {}
         for i in arguments:
             if i.startswith('input_'):
@@ -184,46 +186,44 @@ ORDER BY 1, 2
 
         packet_id = randint(0, 64000)
 
-        all_connections = [
-            connections[device_id]
-            for device_id in device_ids if
-            device_id in connections
-        ]
-        print("Got post, commands: %r" % commands)
+        for device in devices:
+            for input_name, value in commands.items():
+                session.add(Measurement(
+                    device=device,
+                    ip_address=get_ip(self),
+                    measurement_name=input_name,
+                    measurement_value=value,
+                    measurement_type='input',
+                    timestamp=datetime.now(),
+                    authority=True
+                ))
 
-        if not all_connections:
-            print("No active connections, abort")
-            self.redirect('.')
-            self.finnish()
+        all_connections = [
+            connections[device.id]
+            for device in devices if
+            device.id in connections
+        ]
+        failures = [
+            device.id for device in devices if
+            device.id not in connections
+        ]
+
+        print("Got post, commands: %r" % commands)
 
         for connection in all_connections:
             waiting[(connection, packet_id)] = self
+            connection.send_commands(commands, packet_id)
 
-            device = session.query(Device).get(connection.device_id)
-            msg = json.dumps({
-                'AUTH': device.device_secret,
-                'control': [{
-                    'name': name,
-                    'type': 'input',
-                    'values': value,
-                    'time': t,
-                    'packet_id': packet_id,
-                    'status': 'ok'
-                } for name, value in commands.items()]
-            })
-            print("Sending to %r, %r" % (connection, msg))
-            connection.write_message(msg)
+        if all_connections:
+            yield gen.sleep(10)
 
-        print("Start sleep")
-        yield gen.sleep(10)
-        print("End sleep")
-
-        failures = []
+        all_done = all_connections
         for connection in all_connections:
             val = waiting.pop((connection, packet_id), None)
             if val:
                 failures.append(connection.device_id)
-        if not failures:
+                all_done = False
+        if all_done:
             print("Main thread abort, already responded")
             return
         self.end_post(failures)
@@ -250,6 +250,11 @@ def get_ip(handler):
 
 class DeviceHandler(websocket.WebSocketHandler):
     device_id = None
+
+    def send_commands(self, commands, packet_id=0):
+        msg = ("%d\n" % packet_id) + "\n".join("SET %s %d" % (name, value) for name, value in commands.items())
+        print("Sending to %r, %r" % (self, msg))
+        self.write_message(msg)
 
     def open(self):
         print("Open conn: {}".format(self))
@@ -322,19 +327,53 @@ class DeviceHandler(websocket.WebSocketHandler):
                         measurement['time'],
                         '%Y-%m-%d %H:%M:%S'
                     )
-                    if session.query(Measurement).filter(
-                        Measurement.device == device,
-                        Measurement.measurement_name == measurement_name,
-                        Measurement.timestamp == timestamp
-                    ).count() == 0:
-                        session.add(Measurement(
-                            device=device,
-                            ip_address=ip_address,
-                            measurement_name=measurement_name,
-                            measurement_value=measurement_value,
-                            measurement_type=measurement_type,
-                            timestamp=timestamp
-                        ))
+                    if measurement_name == 'Boot':
+                        for input_name in measurement['names']['input_names']:
+                            session.add(Measurement(
+                                device=device,
+                                ip_address=ip_address,
+                                measurement_name=input_name,
+                                measurement_value=0,
+                                measurement_type='input',
+                                timestamp=timestamp
+                            ))
+                            if session:
+                                ex = session.query(Measurement).filter(
+                                    Measurement.device == device,
+                                    Measurement.measurement_name == input_name,
+                                    Measurement.authority
+                                ).order_by(
+                                    desc(Measurement.timestamp)
+                                ).first()
+                                if ex:
+                                    connections[device.id].send_commands(
+                                        {input_name: ex.measurement_value}
+                                    )
+
+
+                        for event_name in measurement['names']['event_names']:
+                            session.add(Measurement(
+                                device=device,
+                                ip_address=ip_address,
+                                measurement_name=event_name,
+                                measurement_value=0,
+                                measurement_type='event',
+                                timestamp=timestamp
+                            ))
+                    else:
+                        if session.query(Measurement).filter(
+                            Measurement.device == device,
+                            Measurement.measurement_name == measurement_name,
+                            Measurement.timestamp == timestamp
+                        ).count() == 0:
+                            session.add(Measurement(
+                                device=device,
+                                ip_address=ip_address,
+                                measurement_name=measurement_name,
+                                measurement_value=measurement_value,
+                                measurement_type=measurement_type,
+                                timestamp=timestamp
+                            ))
                 self.write_message(json.dumps({'packet_id': max_id, 'status': 'ok'}))
             session.commit()
             return
@@ -366,7 +405,7 @@ if __name__ == "__main__":
             session.add(Measurement(
                 device=device,
                 ip_address='127.0.0.1',
-                measurement_name='Bootup',
+                measurement_name='Boot',
                 measurement_type='event',
                 measurement_value=1,
                 timestamp=datetime.now() - timedelta(minutes=15*101)
