@@ -68,6 +68,31 @@ void debugBlink(const int debugLed, const unsigned long errorcode){
     digitalWrite(debugLed, HIGH);
 }
 
+uint8_t * heapptr, * stackptr;
+void check_mem() {
+  stackptr = (uint8_t *)malloc(4);          // use stackptr temporarily
+  heapptr = stackptr;                     // save value of heap pointer
+  free(stackptr);      // free up the memory again (sets stackptr to 0)
+  uint8_t stackptr2;
+  stackptr = &stackptr2;           // save value of stack pointer
+}
+
+String getTime(){
+     const String Y = String(year());
+     const String M = String(month());
+     const String D = String(day());
+     const String h = String(hour());
+     const String m = String(minute());
+     const String s = String(second());
+     
+     String time = Y;
+     time += "-" + ((M.length()==2)?M:"0"+M);
+     time += "-" + ((D.length()==2)?D:"0"+D);
+     time += " " + ((h.length()==2)?h:"0"+h);
+     time += ":" + ((m.length()==2)?m:"0"+m);
+     time += ":" + ((s.length()==2)?s:"0"+s);
+     return time;
+}
 
 void debugRequest(String message){
       webSocketClient.sendData("{\"message\":\""+message+"\"}");
@@ -155,7 +180,7 @@ void bootEvent(){
         data += "\"type\":\"event\", ";
         data += "\"packet_id\":0, ";
         data += "\"value\":0, ";
-        data += "\"time\":\"\", ";
+        data += "\"time\":\""+getTime()+"\", ";
         data += "\"name\":\"Boot\", ";
         
       data += String("\"names\": {");      
@@ -171,7 +196,7 @@ void bootEvent(){
       for(int i=0; i<measurementPinSize; i++){
         data += (i==0)?"\""+measurementName[i]+"\"":(",\""+measurementName[i]+"\"");
       }
-      data += "]}}]";
+      data += "]}}]}";
       webSocketClient.sendData(data);  
 }
 
@@ -221,7 +246,7 @@ void setup() {
     if (makeconnection())
       break; // connected
   }
-  bootEvent();
+  // bootEvent();
   initializeTimer();
 }
 boolean makeconnection(){
@@ -265,7 +290,7 @@ class record{
    String time;
 };
  
-const int history_size = 100;
+const int history_size = 200;
 record history[history_size];
 int history_iterator = 0;
 
@@ -276,23 +301,10 @@ void isBufferFull(){
     }
 }
 
-void fillBuffer(){ 
-     //time_t t = now();
 
-     
-     const String Y = String(year());
-     const String M = String(month());
-     const String D = String(day());
-     const String h = String(hour());
-     const String m = String(minute());
-     const String s = String(second());
-     
-     String time = Y;
-     time += "-" + ((M.length()==2)?M:"0"+M);
-     time += "-" + ((D.length()==2)?D:"0"+D);
-     time += " " + ((h.length()==2)?h:"0"+h);
-     time += ":" + ((m.length()==2)?m:"0"+m);
-     time += ":" + ((s.length()==2)?s:"0"+s);
+
+void fillBuffer(){ 
+    String time = getTime();
   
     for(int i=0; i<eventPinSize; i++){
         const int PIN = eventPins[i];
@@ -321,19 +333,19 @@ void fillBuffer(){
 int nameToPin(const char *name_){
     String name = (String)(name_);
     for(int i=0; i<eventPinSize; i++){
-        const String pin_name = eventNames[i];
+        const String pin_name = eventName[i];
         if (name == pin_name){
            return eventPins[i];
         }
     }
     for(int i=0; i<measurementPinSize; i++){
-        const String pin_name = measurementNames[i];
+        const String pin_name = measurementName[i];
         if (name == pin_name){
            return measurementPins[i];
         }
     }
     for(int i=0; i<ledPinSize; i++){
-        const int pin_name = ledNames[i];
+        const String pin_name = ledName[i];
         if (name == pin_name){
            return ledPins[i];
         }
@@ -378,6 +390,7 @@ void loop() {
   fillBuffer();
   debugBlink(34,0);
   
+  
   if (client.connected()) {
     
     webSocketClient.getData(data);
@@ -387,50 +400,48 @@ void loop() {
         digitalWrite(ledPins[4], HIGH);
 
         const char *lines = data.c_str();
+        unsigned long pctime=0;
+        int offset = 0, pin=0, mode=0;
         // lue ekalta riviltä lähetyksen id\n
-        int packet_id = 1337, offset = 0;
+        int packet_id = 1337;
+        
         if (sscanf(lines, "%d%n", &packet_id, &offset)==1){
             lines += offset+1;
          }
 
 
-        unsigned long pctime=0;
-        int pin=0, mode=0;
+
         for (int i=0; i<100; i++){
-/*
-          if (sscanf(lines, "SET %d %d%n", &pin, &mode, &offset)==2){ // PIN pitäs olla pin_name
-            lines += offset+1;
-            digitalWrite(pin, mode);
-            //printf("read: command=SET, x=%d, y=%d; offset = %5d, val=%d\n", x,y, offset, val);
-            continue;
-          }
-*/
-          char pin_word[1000]; // TODO: buffer overflow
-          if (sscanf(lines, "SET %s %d%n", &pin_word, &mode, &offset)==2){ // PIN pitäs olla pin_name
+          char pin_word[100]; // TODO: buffer overflow
+
+          if (sscanf(lines, "SET %s %d%n", pin_word, &mode, &offset)==2){ // PIN pitäs olla pin_name
             lines += offset+1;
             const int pin = nameToPin(pin_word); //atoi(pin_word); // TEEE
+            if (pin < 20) debugBlink(debugLed, 20);
             digitalWrite(pin, mode);
             //printf("read: command=SET, x=%d, y=%d; offset = %5d, val=%d\n", x,y, offset, val);
+            debugRequest("set_success; i="+ String(i)+ ", pin=" + String(pin) + ", mode="+ String(mode) + ", data=" + data);
             continue;
           }
+          
           if (sscanf(lines, "TIME %lu%n", &pctime, &offset)==1){
             lines += offset+1;
             // debugRequest("read: command=TIME, x=" + String(pctime));
             setTime(pctime);
+            debugRequest("time_success; i="+ String(i)+ ", pctime=" + String(pctime) + ", data=" + data);
+            bootEvent();
             continue;
           }
-    
+          if ((lines[0] == 0) || (((int)data.length()) - (lines-data.c_str()) <= 0))
+            break;
+          debugRequest("Unknown command; '"+ String(lines) + "', '" + data+"'," + String(lines-data.c_str()));
           break;
         }
+        
         //int packet_id = 123;
         String ack = "{\"status\":\"ok\",\"packet_id\":"+String(packet_id)+"}";
-        webSocketClient.sendData(data);
-        // kuittaus {"status":"ok","packet_id":123}
-
-        
-          
-
-        
+        // if (packet_id == 1337){debugRequest("packetid=1337, data=" + data + ", lines="+String(lines));}
+        webSocketClient.sendData(ack);
     }
 
     static int packet_counter = 0;
