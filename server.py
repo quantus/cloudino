@@ -261,7 +261,7 @@ class DeviceHandler(websocket.WebSocketHandler):
         print("Open conn: {}".format(self))
         unknown_connections.append(self)
         timestamp = str(int(time.time()))
-        self.write_message("TIME " + timestamp)
+        self.write_message("0\nTIME " + timestamp)
         print ("SENDING TIMESTAMP: %s" % timestamp)
 
     def on_close(self):
