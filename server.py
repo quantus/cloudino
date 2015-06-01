@@ -253,7 +253,7 @@ class DeviceHandler(websocket.WebSocketHandler):
     device_id = None
 
     def send_commands(self, commands, packet_id=0):
-        msg = ("%d\n" % packet_id) + "\n".join("SET %s %d" % (name, value) for name, value in commands.items())
+        msg = ("%d\n" % packet_id) + "\n".join("SET %s %d" % (name, value) for name, value in commands.items()) + "\n"
         print("Sending to %r, %r" % (self, msg))
         self.write_message(msg)
 
@@ -261,7 +261,7 @@ class DeviceHandler(websocket.WebSocketHandler):
         print("Open conn: {}".format(self))
         unknown_connections.append(self)
         timestamp = str(int(time.time()))
-        self.write_message("0\nTIME " + timestamp)
+        self.write_message("10\nTIME " + timestamp+"\n") #+ "\nSET LED30 0\nSET LED32 1\nSET LED34 0")
         print ("SENDING TIMESTAMP: %s" % timestamp)
 
     def on_close(self):
@@ -270,7 +270,7 @@ class DeviceHandler(websocket.WebSocketHandler):
             unknown_connections.remove(self)
         else:
             print("Close conn: {}, {}".format(self.device_id, self))
-            if connections[self.device_id] == self:
+            if connections.get(self.device_id) == self:
                 del connections[self.device_id]
 
     def on_message(self, message):
@@ -378,6 +378,8 @@ class DeviceHandler(websocket.WebSocketHandler):
                 self.write_message(json.dumps({'packet_id': max_id, 'status': 'ok'}))
             session.commit()
             return
+        except TypeError as e:
+            print("Error(%r), ignored: %r" % (e, message))
         except ValueError as e:
             print("Error(%r), ignored: %r" % (e, message))
         except KeyError as e:
