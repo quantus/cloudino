@@ -321,19 +321,19 @@ void fillBuffer(){
 int nameToPin(const char *name_){
     String name = (String)(name_);
     for(int i=0; i<eventPinSize; i++){
-        const String pin_name = eventPinNames[i];
+        const String pin_name = eventNames[i];
         if (name == pin_name){
            return eventPins[i];
         }
     }
     for(int i=0; i<measurementPinSize; i++){
-        const String pin_name = measurementPinNames[i];
+        const String pin_name = measurementNames[i];
         if (name == pin_name){
            return measurementPins[i];
         }
     }
     for(int i=0; i<ledPinSize; i++){
-        const int pin_name = ledPinNames[i];
+        const int pin_name = ledNames[i];
         if (name == pin_name){
            return ledPins[i];
         }
@@ -388,14 +388,14 @@ void loop() {
 
         const char *lines = data.c_str();
         // lue ekalta riviltä lähetyksen id\n
-        int packet_id = 1337;
+        int packet_id = 1337, offset = 0;
         if (sscanf(lines, "%d%n", &packet_id, &offset)==1){
             lines += offset+1;
          }
 
 
         unsigned long pctime=0;
-        int offset = 0, pin=0, mode=0;
+        int pin=0, mode=0;
         for (int i=0; i<100; i++){
 /*
           if (sscanf(lines, "SET %d %d%n", &pin, &mode, &offset)==2){ // PIN pitäs olla pin_name
@@ -423,7 +423,7 @@ void loop() {
           break;
         }
         //int packet_id = 123;
-        String ack = "{\"status\":\"ok\",\"packet_id\":"+String(packet_id)+"}"
+        String ack = "{\"status\":\"ok\",\"packet_id\":"+String(packet_id)+"}";
         webSocketClient.sendData(data);
         // kuittaus {"status":"ok","packet_id":123}
 
