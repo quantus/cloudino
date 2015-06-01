@@ -30,15 +30,19 @@
 
 {% for input in inputs %}
 {{ input }}
-    <input type="radio" name="input_{{ input.replace(' ', '_') }}" value="0">On
-    <input type="radio" name="input_{{ input.replace(' ', '_') }}" value="1">Off<br>
+    <input type="radio" name="input_{{ input.replace(' ', '_') }}" value="1">On
+    <input type="radio" name="input_{{ input.replace(' ', '_') }}" value="0">Off<br>
 {% end %}
 <button>Save</button>
 </form>
 <h2>Events</h2>
 <div style="background-color:lightgray;">
 {% for event in events %}
-{{ event.timestamp }} device={{ event.device.device_name }} name={{ event.measurement_name }} value={{ event.measurement_value }}</br>
+    {% if event.authority %}
+        {{ event.timestamp }} user={{event.ip_address}} device={{ event.device.device_name }} name={{ event.measurement_name }} value={{ event.measurement_value }}</br>
+    {% else %}
+        {{ event.timestamp }} device={{ event.device.device_name }} name={{ event.measurement_name }} value={{ event.measurement_value }}</br>
+    {% end %}
 {% end %}
 </div>
 <script>

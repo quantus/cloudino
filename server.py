@@ -197,6 +197,7 @@ ORDER BY 1, 2
                     timestamp=datetime.now(),
                     authority=True
                 ))
+        session.commit()
 
         all_connections = [
             connections[device.id]
