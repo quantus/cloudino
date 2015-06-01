@@ -318,6 +318,29 @@ void fillBuffer(){
     }
 }
 
+int nameToPin(const char *name_){
+    String name = (String)(name_);
+    for(int i=0; i<eventPinSize; i++){
+        const String pin_name = eventPinNames[i];
+        if (name == pin_name){
+           return eventPins[i];
+        }
+    }
+    for(int i=0; i<measurementPinSize; i++){
+        const String pin_name = measurementPinNames[i];
+        if (name == pin_name){
+           return measurementPins[i];
+        }
+    }
+    for(int i=0; i<ledPinSize; i++){
+        const int pin_name = ledPinNames[i];
+        if (name == pin_name){
+           return ledPins[i];
+        }
+    }
+    return 0;
+}
+
 String pinToName(const int targetPIN){
     for(int i=0; i<eventPinSize; i++){
         const int PIN = eventPins[i];
@@ -365,11 +388,27 @@ void loop() {
 
         const char *lines = data.c_str();
         // lue ekalta riviltä lähetyksen id\n
+        int packet_id = 1337;
+        if (sscanf(lines, "%d%n", &packet_id, &offset)==1){
+            lines += offset+1;
+         }
+
+
         unsigned long pctime=0;
         int offset = 0, pin=0, mode=0;
         for (int i=0; i<100; i++){
+/*
           if (sscanf(lines, "SET %d %d%n", &pin, &mode, &offset)==2){ // PIN pitäs olla pin_name
             lines += offset+1;
+            digitalWrite(pin, mode);
+            //printf("read: command=SET, x=%d, y=%d; offset = %5d, val=%d\n", x,y, offset, val);
+            continue;
+          }
+*/
+          char pin_word[1000]; // TODO: buffer overflow
+          if (sscanf(lines, "SET %s %d%n", &pin_word, &mode, &offset)==2){ // PIN pitäs olla pin_name
+            lines += offset+1;
+            const int pin = nameToPin(pin_word); //atoi(pin_word); // TEEE
             digitalWrite(pin, mode);
             //printf("read: command=SET, x=%d, y=%d; offset = %5d, val=%d\n", x,y, offset, val);
             continue;
@@ -383,7 +422,7 @@ void loop() {
     
           break;
         }
-        int packet_id = 123;
+        //int packet_id = 123;
         String ack = "{\"status\":\"ok\",\"packet_id\":"+String(packet_id)+"}"
         webSocketClient.sendData(data);
         // kuittaus {"status":"ok","packet_id":123}
