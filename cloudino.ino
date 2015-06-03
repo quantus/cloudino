@@ -13,7 +13,7 @@
 // Define how many callback functions you have. Default is 1.
 #define CALLBACK_FUNCTIONS 1
 
-#include "WebSocketClient.h"
+// #include "WebSocketClient.h"
 
 template <typename T, size_t N>
 inline size_t SizeOfArray( const T(&)[ N ] ){
@@ -32,7 +32,7 @@ GSM gsmAccess;
 #define GPRS_LOGIN     ""    // replace with your GPRS login
 #define GPRS_PASSWORD  "" // replace with your GPRS password
 
-WebSocketClient webSocketClient;
+// WebSocketClient webSocketClient;
 
 const String authtoken = "SECRET_KEY2000005";
 const String devicename = "JMT1 device";
@@ -95,7 +95,9 @@ String getTime(){
 }
 
 void debugRequest(String message){
-      webSocketClient.sendData("{\"message\":\""+message+"\"}");
+      // webSocketClient.sendData("{\"message\":\""+message+"\"}");
+      client.println("{\"message\":\""+message+"\"}");
+      client.println();
 }
 
 
@@ -197,7 +199,9 @@ void bootEvent(){
         data += (i==0)?"\""+measurementName[i]+"\"":(",\""+measurementName[i]+"\"");
       }
       data += "]}}]}";
-      webSocketClient.sendData(data);  
+      //webSocketClient.sendData(data);  
+      client.println(data);
+      client.println();
 }
 
 void initializeTimer(){
@@ -250,8 +254,8 @@ void setup() {
   initializeTimer();
 }
 boolean makeconnection(){
-  webSocketClient.path = "/api";
-  webSocketClient.host = "892c05e9.ngrok.io"; // "04b5bc2b.ngrok.io";
+  // webSocketClient.path = "/api";
+  // webSocketClient.host = "892c05e9.ngrok.io"; // "04b5bc2b.ngrok.io";
 
   digitalWrite(ledPins[2], LOW);
   digitalWrite(ledPins[3], LOW);
@@ -261,6 +265,9 @@ boolean makeconnection(){
   
   if(client.connect("173.255.197.142", 80)) {
     digitalWrite(ledPins[2], HIGH); //Serial.println("Connection successful");
+    
+    
+    /*
     if (webSocketClient.handshake(client)){
         digitalWrite(ledPins[3], HIGH); //Serial.println("Handshake successful");
         return true;
@@ -268,6 +275,9 @@ boolean makeconnection(){
         debugBlink(debugLed,15); //Serial.println("Handshake failed.");
         client.stop();
     }
+    */
+    digitalWrite(ledPins[3], HIGH); // TODO: useless
+    return true;
   } else {
       debugBlink(debugLed,2);  //Serial.println("Connection failed.");
   }
@@ -374,30 +384,12 @@ String pinToName(const int targetPIN){
     }
     return "";
 }
-/*
-{  "names":[
-     "input_names":{"A","b","c"},
-     "event_names":{"A","b","c"},
-     "measurement_names":{"A","b","c"}
-   ]
-}
-*/
 
-
-void loop() {
-  String data;
-  
-  fillBuffer();
-  debugBlink(34,0);
-  
-  
-  if (client.connected()) {
+void handleMessage(const String data){
+       // if (data.length() == 0)  return;
     
-    webSocketClient.getData(data);
-
-    if (data.length() > 0) {
       //Serial.println("Received data: " + data);
-        digitalWrite(ledPins[4], HIGH);
+      //  digitalWrite(ledPins[4], HIGH);
 
         const char *lines = data.c_str();
         unsigned long pctime=0;
@@ -441,15 +433,16 @@ void loop() {
         //int packet_id = 123;
         String ack = "{\"status\":\"ok\",\"packet_id\":"+String(packet_id)+"}";
         // if (packet_id == 1337){debugRequest("packetid=1337, data=" + data + ", lines="+String(lines));}
-        webSocketClient.sendData(ack);
-    }
+        //webSocketClient.sendData(ack);
+        client.println(ack);
+        client.println();
+}
 
-    static int packet_counter = 0;
-
-    // debugBlink(34,history_iterator); // wtf
+void handleBuffer(){
+      static int packet_counter = 0;
     
     if (history_iterator){
-      data = String("{") + String("\"AUTH\":\""+authtoken+"\",")
+      String data = String("{") + String("\"AUTH\":\""+authtoken+"\",")
       + String("\"name\":\""+devicename+"\",")
       + String("\"measurements\": [");
       
@@ -471,11 +464,33 @@ void loop() {
       }
       
       data += "]}";
-      webSocketClient.sendData(data);
+      //webSocketClient.sendData(data);
+      client.println(data);
+      client.println();
       history_iterator = 0;
      
       digitalWrite(ledPins[5], HIGH);
     }
+}
+
+
+void loop() {
+  String data;
+  
+  fillBuffer();
+  debugBlink(34,0);
+  
+  
+  if (client.connected()) {
+    if (client.available()) { // TODO: näinkö
+      data += client.read();
+      const int s = data.length();
+      if (2<=s && data[s-1] == '\n' && data[s-2] == '\n'){
+          handleMessage(data);
+          digitalWrite(ledPins[4], HIGH);
+      }
+    }
+    handleBuffer();
   } else {
     // debugBlink(debugLed,10);    //Serial.println("Connection disconnected.");
     if (makeconnection())
