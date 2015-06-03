@@ -8,6 +8,7 @@ from collections import OrderedDict, defaultdict
 import tornado.ioloop
 import tornado.web
 from tornado import gen, websocket
+from tornado.tcpserver import TCPServer
 from sqlalchemy import (
     create_engine,
     Column,
@@ -249,7 +250,7 @@ def get_ip(handler):
     )
 
 
-class DeviceHandler(websocket.WebSocketHandler):
+class DeviceLogicHandler(object):
     device_id = None
 
     def send_commands(self, commands, packet_id=0):
@@ -386,11 +387,38 @@ class DeviceHandler(websocket.WebSocketHandler):
             print("Missing needed values(%r), ignored: %r" % (e, message))
         session.rollback()
 
+
+class DeviceHandler(websocket.WebSocketHandler, DeviceLogicHandler):
+    pass
+
+
+class TCPDeviceServer(TCPServer, DeviceLogicHandler):
+    def write_message(self, data):
+        self._stream.write(data.encode('ascii'))
+
+    def _on_disconnect(self, *args, **kwargs):
+        self.on_close()
+        self.is_alive = False
+
+    def handle_stream(self, stream, address):
+        self.is_alive = True
+        self._stream = stream
+        self.open()
+        self._stream.set_close_callback(self._on_disconnect)
+        self._stream.read_until(b'\n', self._handle_read)
+
+    def _handle_read(self, data):
+        self.on_message(data.decode('ascii'))
+        self._stream.read_until(b'\n', self._handle_read)
+
+
 application = tornado.web.Application([
     (r"/", MainHandler),
     (r"/view_devices", ViewHandler),
     (r"/api", DeviceHandler),
 ])
+tcp_application = TCPDeviceServer()
+
 if __name__ == "__main__":
     if '-create' in sys.argv:
         print("Creating tables")
@@ -459,6 +487,7 @@ if __name__ == "__main__":
     else:
         print("Server start")
         application.listen(8888)
+        tcp_application.listen(8889)
         try:
             tornado.ioloop.IOLoop.instance().start()
         except KeyboardInterrupt:
