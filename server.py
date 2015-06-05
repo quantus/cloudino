@@ -408,11 +408,13 @@ class TCPDeviceServer(TCPServer, DeviceLogicHandler):
         self._stream.read_until(b'\n', self._handle_read)
 
     def _handle_read(self, data):
-        self.on_message(
+        msg = (
             data.decode('ascii')
             .replace('\n', '')
             .replace('\r', '')
         )
+        if msg:
+            self.on_message(msg)
         self._stream.read_until(b'\n', self._handle_read)
 
 
