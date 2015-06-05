@@ -382,6 +382,7 @@ class DeviceLogicHandler(object):
                                 )
                                 msg = {"message":msg}
                                 import urllib
+                                import urllib.request
                                 urllib.request.urlopen("http://hattivatti.myftp.org/notice.php?%s" % urllib.urlencode(msg))
 
                 self.write_message(json.dumps({'packet_id': max_id, 'status': 'ok'}))
