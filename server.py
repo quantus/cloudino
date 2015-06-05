@@ -254,7 +254,7 @@ class DeviceLogicHandler(object):
     device_id = None
 
     def send_commands(self, commands, packet_id=0):
-        msg = ("%d\n" % packet_id) + "\n".join("SET %s %d" % (name, value) for name, value in commands.items()) + "\n"
+        msg = ("%d\n" % packet_id) + "\n".join("SET %s %d" % (name, value) for name, value in commands.items()) + "\n\n"
         print("Sending to %r, %r" % (self, msg))
         self.write_message(msg)
 
@@ -262,7 +262,7 @@ class DeviceLogicHandler(object):
         print("Open conn: {}".format(self))
         unknown_connections.append(self)
         timestamp = str(int(time.time()))
-        self.write_message("10\nTIME " + timestamp+"\n") #+ "\nSET LED30 0\nSET LED32 1\nSET LED34 0")
+        self.write_message("10\nTIME " + timestamp+"\n\n") #+ "\nSET LED30 0\nSET LED32 1\nSET LED34 0")
         print ("SENDING TIMESTAMP: %s" % timestamp)
 
     def on_close(self):
