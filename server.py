@@ -247,7 +247,7 @@ def get_ip(handler):
     return (
         handler.request.headers.get('X-Forwarded-For') or
         handler.request.remote_ip
-    )
+    ) if handler.request else handler._stream.socket.getpeername()[0]
 
 
 class DeviceLogicHandler(object):
