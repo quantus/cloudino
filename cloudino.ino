@@ -96,8 +96,9 @@ String getTime(){
 
 void debugRequest(String message){
       // webSocketClient.sendData("{\"message\":\""+message+"\"}");
-      client.println("{\"message\":\""+message+"\"}");
-      client.println();
+      client.write((const uint8_t*)"{\"message\":\"");
+      client.write((const uint8_t*)message.c_str());
+      client.write((const uint8_t*)"\"}\n");
 }
 
 
@@ -200,8 +201,8 @@ void bootEvent(){
       }
       data += "]}}]}";
       //webSocketClient.sendData(data);  
-      client.println(data);
-      client.println();
+      client.write((const uint8_t*)data.c_str());
+      client.write((const uint8_t*)"\n");
 }
 
 void initializeTimer(){
@@ -263,7 +264,7 @@ boolean makeconnection(){
   digitalWrite(ledPins[5], LOW);
 
   
-  if(client.connect("173.255.197.142", 80)) {
+  if(client.connect("82.130.9.15", 8889)) {
     digitalWrite(ledPins[2], HIGH); //Serial.println("Connection successful");
     
     
@@ -412,7 +413,7 @@ void handleMessage(const String data){
             if (pin < 20) debugBlink(debugLed, 20);
             digitalWrite(pin, mode);
             //printf("read: command=SET, x=%d, y=%d; offset = %5d, val=%d\n", x,y, offset, val);
-            debugRequest("set_success; i="+ String(i)+ ", pin=" + String(pin) + ", mode="+ String(mode) + ", data=" + data);
+            //debugRequest("set_success; i="+ String(i)+ ", pin=" + String(pin) + ", mode="+ String(mode) + ", data=" + data);
             continue;
           }
           
@@ -420,13 +421,13 @@ void handleMessage(const String data){
             lines += offset+1;
             // debugRequest("read: command=TIME, x=" + String(pctime));
             setTime(pctime);
-            debugRequest("time_success; i="+ String(i)+ ", pctime=" + String(pctime) + ", data=" + data);
+            //debugRequest("time_success; i="+ String(i)+ ", pctime=" + String(pctime) + ", data=" + data);
             bootEvent();
             continue;
           }
           if ((lines[0] == 0) || (((int)data.length()) - (lines-data.c_str()) <= 0))
             break;
-          debugRequest("Unknown command; '"+ String(lines) + "', '" + data+"'," + String(lines-data.c_str()));
+          //debugRequest("Unknown command; '"+ String(lines) + "', '" + data+"'," + String(lines-data.c_str()));
           break;
         }
         
@@ -434,11 +435,11 @@ void handleMessage(const String data){
         String ack = "{\"status\":\"ok\",\"packet_id\":"+String(packet_id)+"}";
         // if (packet_id == 1337){debugRequest("packetid=1337, data=" + data + ", lines="+String(lines));}
         //webSocketClient.sendData(ack);
-        client.println(ack);
-        client.println();
+        client.write((const uint8_t*)ack.c_str());
+        client.write((const uint8_t*)"\n");
 }
 
-void handleBuffer(){
+int handleBuffer(){
       static int packet_counter = 0;
     
     if (history_iterator){
@@ -465,39 +466,61 @@ void handleBuffer(){
       
       data += "]}";
       //webSocketClient.sendData(data);
-      client.println(data);
-      client.println();
+
+
+      int status = client.write((const uint8_t*)data.c_str());
+      if (status <= 0) return -1;
+      client.write((const uint8_t*)"\n");
       history_iterator = 0;
      
       digitalWrite(ledPins[5], HIGH);
     }
+    return 0;
 }
 
 
 void loop() {
   String data;
+  //String packet;
   
   fillBuffer();
   debugBlink(34,0);
   
+
   
   if (client.connected()) {
-    if (client.available()) { // TODO: näinkö
-      data += client.read();
-      const int s = data.length();
-      if (2<=s && data[s-1] == '\n' && data[s-2] == '\n'){
-          handleMessage(data);
-          digitalWrite(ledPins[4], HIGH);
-      }
+    int b=0;
+    //debugBlink(34,10);
+    while(client.available()){
+        b = client.read();
+        if (b==-1) break;
+        data += (char)b; //client.read();
     }
-    handleBuffer();
+    //debugBlink(34,5);
+    
+   int begin=0, end=0;
+    while(end < data.length()-1){
+      //debugBlink(34,end);
+
+      if (data[end] == '\n' && data[end+1] == '\n'){
+          String packet = data.substring(begin,end);
+          handleMessage(packet);
+          digitalWrite(ledPins[4], HIGH);
+          end = end + 2;
+          begin = end;
+      }
+      end++;
+   }
+   data = data.substring( begin);
+
+    if (handleBuffer()!=0){
+        if (makeconnection())
+          bootEvent();
+      }
   } else {
     // debugBlink(debugLed,10);    //Serial.println("Connection disconnected.");
     if (makeconnection())
       bootEvent();
   }
   
-  
-  // wait to fully let the client disconnect
-  // delay(3000); // wtf t:toni
 }
