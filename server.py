@@ -185,7 +185,7 @@ ORDER BY 1, 2
 
         t = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-        packet_id = randint(0, 64000)
+        packet_id = randint(0, 32000)
 
         for device in devices:
             for input_name, value in commands.items():
