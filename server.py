@@ -383,7 +383,7 @@ class DeviceLogicHandler(object):
                                 msg = {"message":msg}
                                 import urllib.request
                                 import urllib.parse
-                                urllib.parse.urlencode("http://hattivatti.myftp.org/notice.php?%s" % urllib.urlencode(msg))
+                                urllib.request.urlopen("http://hattivatti.myftp.org/notice.php?%s" % urllib.parse.urlencode(msg))
                 self.write_message(json.dumps({'packet_id': max_id, 'status': 'ok'}))
             session.commit()
             return
