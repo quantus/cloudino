@@ -69,7 +69,7 @@ class MainHandler(tornado.web.RequestHandler):
 
 class ViewHandler(tornado.web.RequestHandler):
     def get(self):
-        failure_ids = map(int, self.request.arguments.get('failure', []))
+        failure_ids = [x for x in map(int, self.request.arguments.get('failure', []))]
         failures = session.query(Device).filter(Device.id.in_(failure_ids)).all() if failure_ids else []
         device_ids = self.request.arguments.get('id', [])
         device_ids = list(set(map(int, device_ids)))
@@ -107,7 +107,7 @@ class ViewHandler(tornado.web.RequestHandler):
         ).all()
         }
 
-        start_date = (datetime.now() - timedelta(days=14)).date()
+        start_date = (datetime.now() - timedelta(days=2)).date()
         end_date = datetime.now()  # .date()
 
         measurements = OrderedDict()
@@ -117,7 +117,7 @@ class ViewHandler(tornado.web.RequestHandler):
                     '''
 WITH t AS (
    SELECT ts
-   FROM   generate_series('%s', '%s', '15 minute'::interval) ts
+   FROM   generate_series('%s', '%s', '1 minute'::interval) ts
    )
 SELECT
     ts,
@@ -126,7 +126,7 @@ SELECT
 FROM t
 LEFT JOIN measurement ON
     date_trunc('hour', timestamp) = date_trunc('hour', ts) AND
-    (extract(minute from timestamp)::int/15) = (extract(minute from ts)::int/15) AND
+    (extract(minute from timestamp)::int/1) = (extract(minute from ts)::int/1) AND
     measurement_name = '%s' AND
     measurement_type = 'measurement'
 WHERE device_id IN (%s) OR device_id IS NULL
