@@ -376,6 +376,13 @@ class DeviceLogicHandler(object):
                                 measurement_type=measurement_type,
                                 timestamp=timestamp
                             ))
+                            if measurement_type == 'event':
+                                msg = "Cloudino: Event %s new_state: %s" % (
+                                    measurement_name, measurement_value
+                                )
+                                import urllib.request
+                                urllib.request.urlopen("http://hattivatti.myftp.org/notice.php?message=%s" % msg)
+
                 self.write_message(json.dumps({'packet_id': max_id, 'status': 'ok'}))
             session.commit()
             return
